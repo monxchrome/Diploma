@@ -1,0 +1,311 @@
+name: decision-intelligence-platform
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: dip-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dip_password}
+      POSTGRES_USER: ${POSTGRES_USER:-dip_user}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    container_name: dip-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.1
+    container_name: dip-qdrant
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  minio:
+    image: minio/minio:RELEASE.2026-07-22T22-23-51Z
+    container_name: dip-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-dip_minio_password}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dip_minio}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  ollama:
+    image: ollama/ollama:0.11.0
+    container_name: dip-ollama
+    profiles: ["ai-heavy"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - dip-internal
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  langfuse-postgres:
+    image: postgres:18-alpine
+    container_name: dip-langfuse-postgres
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${LANGFUSE_POSTGRES_DB:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-langfuse_password}
+      POSTGRES_USER: ${LANGFUSE_POSTGRES_USER:-langfuse}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.7-alpine
+    container_name: dip-clickhouse
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse_password}
+      CLICKHOUSE_USER: langfuse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+
+  langfuse-redis:
+    image: redis:8-alpine
+    container_name: dip-langfuse-redis
+    profiles: ["observability"]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    volumes:
+      - langfuse-redis-data:/data
+
+  langfuse:
+    image: langfuse/langfuse:3
+    container_name: dip-langfuse
+    profiles: ["observability"]
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse_password}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: langfuse
+      DATABASE_URL: postgresql://${LANGFUSE_POSTGRES_USER:-langfuse}:${LANGFUSE_POSTGRES_PASSWORD:-langfuse_password}@langfuse-postgres:5432/${LANGFUSE_POSTGRES_DB:-langfuse}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-replace-with-64-char-hex-dev-encryption-key-000000}
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-dip_minio}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${MINIO_BUCKET:-dip-local}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-dip_minio_password}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-replace-with-dev-nextauth-secret}
+      NEXTAUTH_URL: ${LANGFUSE_URL:-http://localhost:3002}
+      REDIS_CONNECTION_STRING: redis://langfuse-redis:6379/0
+      SALT: ${LANGFUSE_SALT:-replace-with-dev-salt-at-least-32-chars}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/public/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "${LANGFUSE_PORT:-3002}:3000"
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+      target: development
+    container_name: dip-ai-service
+    profiles: ["apps"]
+    restart: unless-stopped
+    environment:
+      AI_SERVICE_URL: http://ai-service:8000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_HOST: http://langfuse:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-replace-with-dev-public-key}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-replace-with-dev-secret-key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: ${NODE_ENV:-development}
+      OLLAMA_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/ai-service:/app/apps/ai-service
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    container_name: dip-api
+    profiles: ["apps"]
+    restart: unless-stopped
+    depends_on:
+      ai-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AI_SERVICE_URL: http://ai-service:8000
+      BULLMQ_CONNECTION_URL: redis://redis:6379/1
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dip_user}:${POSTGRES_PASSWORD:-dip_password}@postgres:5432/${POSTGRES_DB:-dip}?schema=public
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      REDIS_URL: redis://redis:6379/0
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: development
+    container_name: dip-web
+    profiles: ["apps"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:3001
+      NEXT_PUBLIC_ENVIRONMENT: ${NODE_ENV:-development}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - dip-internal
+    ports:
+      - "3000:3000"
+
+networks:
+  dip-internal:
+    name: dip-internal
+    driver: bridge
+    internal: false
+
+volumes:
+  clickhouse-data:
+  langfuse-postgres-data:
+  langfuse-redis-data:
+  minio-data:
+  ollama-data:
+  postgres-data:
+  qdrant-data:
+  redis-data:

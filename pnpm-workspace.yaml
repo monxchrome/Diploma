@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  "@prisma/engines": true
+  "@scarf/scarf": false
+  "@swc/core": true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - globals@17.8.0
+  - jsdom@30.0.0

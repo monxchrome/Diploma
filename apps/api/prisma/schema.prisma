@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model SystemCheck {
+  id        String   @id @default(uuid())
+  service   String
+  status    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([service, createdAt])
+}

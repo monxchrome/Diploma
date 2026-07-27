@@ -1,0 +1,48 @@
+{
+  "name": "decision-intelligence-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "ai:build": "cd apps/ai-service && python -m uv run python -m compileall app",
+    "ai:format": "cd apps/ai-service && python -m uv run ruff format .",
+    "ai:format:check": "cd apps/ai-service && python -m uv run ruff format --check .",
+    "ai:lint": "cd apps/ai-service && python -m uv run ruff check .",
+    "ai:test": "cd apps/ai-service && python -m uv run pytest",
+    "ai:typecheck": "cd apps/ai-service && python -m uv run pyright",
+    "build": "corepack pnpm db:generate && turbo build && cd apps/ai-service && python -m uv run python -m compileall app",
+    "db:generate": "corepack pnpm --filter @dip/api db:generate",
+    "db:migrate": "corepack pnpm --filter @dip/api db:migrate",
+    "db:studio": "corepack pnpm --filter @dip/api db:studio",
+    "dev": "turbo dev --parallel",
+    "format": "prettier --check . && cd apps/ai-service && python -m uv run ruff format --check .",
+    "format:write": "prettier --write .",
+    "healthcheck": "node scripts/healthcheck.mjs",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "infra:up": "docker compose up -d postgres redis qdrant minio",
+    "lint": "corepack pnpm db:generate && turbo lint && cd apps/ai-service && python -m uv run ruff check .",
+    "prisma:validate": "corepack pnpm --filter @dip/api prisma:validate",
+    "test": "corepack pnpm db:generate && turbo test && cd apps/ai-service && python -m uv run pytest",
+    "typecheck": "corepack pnpm db:generate && turbo typecheck && cd apps/ai-service && python -m uv run pyright"
+  },
+  "devDependencies": {
+    "@dip/eslint-config": "workspace:*",
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.12",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^17.8.0",
+    "pnpm": "11.17.0",
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.7",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0"
+  }
+}
