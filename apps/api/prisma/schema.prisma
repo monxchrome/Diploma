@@ -7,6 +7,22 @@ datasource db {
   provider = "postgresql"
 }
 
+enum GlobalRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ProjectMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -15,4 +31,90 @@ model SystemCheck {
   createdAt DateTime @default(now())
 
   @@index([service, createdAt])
+}
+
+model User {
+  id              String          @id @default(uuid()) @db.Uuid
+  email           String          @unique
+  passwordHash    String
+  displayName     String
+  globalRole      GlobalRole      @default(USER)
+  status          UserStatus      @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  sessions        AuthSession[]
+  ownedProjects   Project[]       @relation("ProjectOwner")
+  memberships     ProjectMember[]
+  auditLogs       AuditLog[]      @relation("AuditLogActor")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String    @unique
+  familyId         String    @db.Uuid
+  userAgent        String?
+  ipHash           String?
+  expiresAt        DateTime
+  lastUsedAt       DateTime
+  revokedAt        DateTime?
+  revokeReason     String?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@index([familyId, revokedAt])
+}
+
+model Project {
+  id          String          @id @default(uuid()) @db.Uuid
+  ownerId     String          @db.Uuid
+  name        String
+  description String?
+  settings    Json            @default("{}")
+  archivedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members     ProjectMember[]
+  auditLogs   AuditLog[]
+
+  @@index([ownerId])
+  @@index([archivedAt])
+  @@index([createdAt])
+}
+
+model ProjectMember {
+  projectId String            @db.Uuid
+  userId    String            @db.Uuid
+  role      ProjectMemberRole
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@index([role])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String?  @db.Uuid
+  projectId   String?  @db.Uuid
+  requestId   String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([action, createdAt])
+  @@index([requestId])
 }

@@ -1,10 +1,12 @@
 import type { HealthResponse } from "@dip/contracts";
 import { Controller, Get, Inject } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
 
 import { HealthService } from "./health.service";
 
 @Controller("health")
+@SkipThrottle()
 export class HealthController {
   constructor(
     @Inject(ConfigService) private readonly configService: ConfigService,

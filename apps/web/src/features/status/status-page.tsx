@@ -1,7 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BrainCircuit, Clock3, RefreshCw, Server, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  BrainCircuit,
+  Clock3,
+  LogIn,
+  RefreshCw,
+  Server,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,10 +49,26 @@ export function StatusPage() {
               System Status
             </h1>
           </div>
-          <Button onClick={() => void query.refetch()} disabled={query.isFetching}>
-            <RefreshCw className={query.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+              href="/login"
+            >
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+              Sign in
+            </Link>
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition-colors hover:bg-teal-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              href="/register"
+            >
+              <UserPlus className="h-4 w-4" aria-hidden="true" />
+              Create account
+            </Link>
+            <Button onClick={() => void query.refetch()} disabled={query.isFetching}>
+              <RefreshCw className={query.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </section>
 

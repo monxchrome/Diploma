@@ -13,6 +13,7 @@
   "dependencies": {
     "@dip/contracts": "workspace:*",
     "@dip/ui": "workspace:*",
+    "@hookform/resolvers": "^5.5.7",
     "@tanstack/react-query": "^5.101.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -20,9 +21,10 @@
     "next": "^16.2.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-hook-form": "^7.83.0",
     "tailwind-merge": "^3.3.0",
-    "zustand": "^5.0.14",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@dip/eslint-config": "workspace:*",

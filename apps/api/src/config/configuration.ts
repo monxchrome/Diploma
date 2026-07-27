@@ -14,6 +14,33 @@ export default function configuration() {
       port: env.PORT,
       serviceName: env.SERVICE_NAME,
     },
+    auth: {
+      accessSecret: env.JWT_ACCESS_SECRET,
+      accessTtl: env.JWT_ACCESS_TTL,
+      cookie: {
+        domain: env.AUTH_COOKIE_DOMAIN?.trim() ? env.AUTH_COOKIE_DOMAIN.trim() : undefined,
+        name: env.AUTH_COOKIE_NAME,
+        sameSite: env.AUTH_COOKIE_SAME_SITE,
+        secure: env.AUTH_COOKIE_SECURE,
+      },
+      passwordMinLength: env.PASSWORD_MIN_LENGTH,
+      refreshPepper: env.REFRESH_TOKEN_PEPPER,
+      refreshTtl: env.REFRESH_TOKEN_TTL,
+      throttles: {
+        login: {
+          limit: env.AUTH_LOGIN_RATE_LIMIT_LIMIT,
+          ttlSeconds: env.AUTH_LOGIN_RATE_LIMIT_TTL_SECONDS,
+        },
+        refresh: {
+          limit: env.AUTH_REFRESH_RATE_LIMIT_LIMIT,
+          ttlSeconds: env.AUTH_REFRESH_RATE_LIMIT_TTL_SECONDS,
+        },
+        register: {
+          limit: env.AUTH_REGISTER_RATE_LIMIT_LIMIT,
+          ttlSeconds: env.AUTH_REGISTER_RATE_LIMIT_TTL_SECONDS,
+        },
+      },
+    },
     cors: {
       origins: loadCorsOrigins(env),
     },

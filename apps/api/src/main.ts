@@ -26,7 +26,7 @@ async function bootstrap(): Promise<void> {
   app.use(json({ limit: configService.getOrThrow<string>("app.bodyLimit") }));
   app.use(urlencoded({ extended: true, limit: configService.getOrThrow<string>("app.bodyLimit") }));
   app.enableCors({
-    credentials: false,
+    credentials: true,
     origin: configService.getOrThrow<string[]>("cors.origins"),
   });
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -34,7 +34,7 @@ async function bootstrap(): Promise<void> {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Decision Intelligence API")
-    .setDescription("Phase 1 infrastructure API")
+    .setDescription("Decision Intelligence Platform API")
     .setVersion("0.1.0")
     .build();
   SwaggerModule.setup("docs", app, SwaggerModule.createDocument(app, swaggerConfig));

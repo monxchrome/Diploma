@@ -1,5 +1,6 @@
 import type { AiEchoResponse, SystemStatusResponse } from "@dip/contracts";
 import { Controller, Get, Inject, Req } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import { getRequestId } from "../../common/logging/request-id";
@@ -10,6 +11,7 @@ export class SystemController {
   constructor(@Inject(SystemService) private readonly systemService: SystemService) {}
 
   @Get("status")
+  @SkipThrottle()
   getStatus(@Req() request: Request): Promise<SystemStatusResponse> {
     return this.systemService.getStatus(getRequestId(request));
   }

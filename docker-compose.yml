@@ -242,12 +242,27 @@ services:
     environment:
       AI_SERVICE_URL: http://ai-service:8000
       BULLMQ_CONNECTION_URL: redis://redis:6379/1
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-dip_refresh}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-lax}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_LOGIN_RATE_LIMIT_LIMIT: ${AUTH_LOGIN_RATE_LIMIT_LIMIT:-10}
+      AUTH_LOGIN_RATE_LIMIT_TTL_SECONDS: ${AUTH_LOGIN_RATE_LIMIT_TTL_SECONDS:-60}
+      AUTH_REFRESH_RATE_LIMIT_LIMIT: ${AUTH_REFRESH_RATE_LIMIT_LIMIT:-30}
+      AUTH_REFRESH_RATE_LIMIT_TTL_SECONDS: ${AUTH_REFRESH_RATE_LIMIT_TTL_SECONDS:-60}
+      AUTH_REGISTER_RATE_LIMIT_LIMIT: ${AUTH_REGISTER_RATE_LIMIT_LIMIT:-5}
+      AUTH_REGISTER_RATE_LIMIT_TTL_SECONDS: ${AUTH_REGISTER_RATE_LIMIT_TTL_SECONDS:-300}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-dip_user}:${POSTGRES_PASSWORD:-dip_password}@postgres:5432/${POSTGRES_DB:-dip}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-local-development-access-secret-32}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: ${NODE_ENV:-development}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
       PORT: 3001
       REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:-replace-with-local-development-refresh-pepper-32}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
     healthcheck:
       test:
         [
@@ -276,7 +291,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://api:3001
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
       NEXT_PUBLIC_ENVIRONMENT: ${NODE_ENV:-development}
     healthcheck:
       test:

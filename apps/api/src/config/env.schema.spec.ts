@@ -20,4 +20,15 @@ describe("API environment validation", () => {
       loadCorsOrigins(validateApiEnv({ CORS_ORIGINS: "http://a.test, http://b.test" })),
     ).toEqual(["http://a.test", "http://b.test"]);
   });
+
+  it("rejects insecure production cookie defaults", () => {
+    expect(() =>
+      validateApiEnv({
+        AUTH_COOKIE_SECURE: "false",
+        JWT_ACCESS_SECRET: "replace-with-local-development-access-secret-32",
+        NODE_ENV: "production",
+        REFRESH_TOKEN_PEPPER: "replace-with-local-development-refresh-pepper-32",
+      }),
+    ).toThrow();
+  });
 });
