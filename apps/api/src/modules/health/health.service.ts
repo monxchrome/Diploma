@@ -7,7 +7,7 @@ import { REDIS_CLIENT } from "../../infrastructure/redis/redis.constants";
 @Injectable()
 export class HealthService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 

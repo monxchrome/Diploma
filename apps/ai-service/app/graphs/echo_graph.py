@@ -12,11 +12,15 @@ class EchoState(TypedDict):
     timestamp: str
 
 
+def utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
 def echo_node(state: EchoState) -> EchoState:
     return {
         "message": state["message"],
         "request_id": state["request_id"],
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": utc_timestamp(),
     }
 
 
@@ -36,7 +40,7 @@ def run_echo_graph(message: str, request_id: str) -> AiEchoResponse:
         {
             "message": message,
             "request_id": request_id,
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": utc_timestamp(),
         }
     )
 

@@ -1,5 +1,5 @@
 import type { HealthResponse } from "@dip/contracts";
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Inject } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { HealthService } from "./health.service";
@@ -7,8 +7,8 @@ import { HealthService } from "./health.service";
 @Controller("health")
 export class HealthController {
   constructor(
-    private readonly configService: ConfigService,
-    private readonly healthService: HealthService,
+    @Inject(ConfigService) private readonly configService: ConfigService,
+    @Inject(HealthService) private readonly healthService: HealthService,
   ) {}
 
   @Get()

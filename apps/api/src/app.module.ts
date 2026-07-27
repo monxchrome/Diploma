@@ -1,6 +1,7 @@
 import { Module, type MiddlewareConsumer, type NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 
 import { RateLimitGuard } from "./common/guards/rate-limit.guard";
@@ -31,6 +32,17 @@ import { SystemModule } from "./modules/system/system.module";
             service: configService.getOrThrow<string>("app.serviceName"),
           }),
         },
+      }),
+    }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            limit: configService.getOrThrow<number>("rateLimit.limit"),
+            ttl: configService.getOrThrow<number>("rateLimit.ttlSeconds") * 1000,
+          },
+        ],
       }),
     }),
     QueueModule,

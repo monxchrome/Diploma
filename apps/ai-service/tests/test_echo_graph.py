@@ -7,3 +7,5 @@ def test_echo_graph_returns_response() -> None:
     assert response.message == "ping"
     assert response.request_id == "req-1"
     assert response.status == "ok"
+    assert isinstance(response.timestamp, str)
+    assert response.timestamp.endswith("Z")

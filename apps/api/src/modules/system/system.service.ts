@@ -1,5 +1,5 @@
 import type { AiEchoResponse, SystemStatusResponse } from "@dip/contracts";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { AiServiceClient } from "../../infrastructure/http/ai-service.client";
@@ -7,8 +7,8 @@ import { AiServiceClient } from "../../infrastructure/http/ai-service.client";
 @Injectable()
 export class SystemService {
   constructor(
-    private readonly aiServiceClient: AiServiceClient,
-    private readonly configService: ConfigService,
+    @Inject(AiServiceClient) private readonly aiServiceClient: AiServiceClient,
+    @Inject(ConfigService) private readonly configService: ConfigService,
   ) {}
 
   async getStatus(requestId: string): Promise<SystemStatusResponse> {

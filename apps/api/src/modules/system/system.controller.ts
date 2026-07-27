@@ -1,5 +1,5 @@
 import type { AiEchoResponse, SystemStatusResponse } from "@dip/contracts";
-import { Controller, Get, Req } from "@nestjs/common";
+import { Controller, Get, Inject, Req } from "@nestjs/common";
 import type { Request } from "express";
 
 import { getRequestId } from "../../common/logging/request-id";
@@ -7,7 +7,7 @@ import { SystemService } from "./system.service";
 
 @Controller("system")
 export class SystemController {
-  constructor(private readonly systemService: SystemService) {}
+  constructor(@Inject(SystemService) private readonly systemService: SystemService) {}
 
   @Get("status")
   getStatus(@Req() request: Request): Promise<SystemStatusResponse> {

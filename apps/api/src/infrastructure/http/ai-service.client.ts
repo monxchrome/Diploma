@@ -1,6 +1,6 @@
 import { AiEchoRequestSchema, AiEchoResponseSchema, type AiEchoResponse } from "@dip/contracts";
 import { HttpService } from "@nestjs/axios";
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { firstValueFrom } from "rxjs";
 
 import { ErrorCodes } from "../../common/errors/error-codes";
@@ -8,7 +8,7 @@ import { REQUEST_ID_HEADER } from "../../common/logging/request-id";
 
 @Injectable()
 export class AiServiceClient {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(@Inject(HttpService) private readonly httpService: HttpService) {}
 
   async echo(message: string, requestId: string): Promise<AiEchoResponse> {
     const payload = AiEchoRequestSchema.parse({ message, requestId });
