@@ -2,7 +2,7 @@ name: decision-intelligence-platform
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: dip-postgres
     restart: unless-stopped
     environment:
@@ -55,7 +55,7 @@ services:
       - qdrant-data:/qdrant/storage
 
   minio:
-    image: minio/minio:RELEASE.2026-07-22T22-23-51Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: dip-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -93,7 +93,7 @@ services:
       - ollama-data:/root/.ollama
 
   langfuse-postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: dip-langfuse-postgres
     profiles: ["observability"]
     restart: unless-stopped
