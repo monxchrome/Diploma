@@ -1,11 +1,13 @@
 import {
   AuthSessionSummarySchema,
+  KnowledgeBaseSchema,
   PaginatedResponseSchema,
   ProjectMemberSchema,
   ProjectSchema,
   ProjectSummarySchema,
   SafeUserSchema,
   SystemStatusResponseSchema,
+  UploadIntentResponseSchema,
   type AuthSessionSummary,
   type PaginatedResponse,
   type Project,
@@ -22,6 +24,47 @@ type ApiRequest = ReturnType<typeof useAuth>["apiRequest"];
 export const ProjectsPageSchema = PaginatedResponseSchema(ProjectSummarySchema);
 export const ProjectMembersSchema = z.array(ProjectMemberSchema);
 export const AuthSessionsSchema = z.array(AuthSessionSummarySchema);
+export const KnowledgeBasesSchema = z.array(KnowledgeBaseSchema);
+
+export function fetchKnowledgeBases(apiRequest: ApiRequest, projectId: string) {
+  return apiRequest(`/api/projects/${projectId}/knowledge-bases`, KnowledgeBasesSchema);
+}
+
+export function createKnowledgeBase(apiRequest: ApiRequest, projectId: string, name: string) {
+  return apiRequest(`/api/projects/${projectId}/knowledge-bases`, KnowledgeBaseSchema, {
+    body: { name },
+    method: "POST",
+  });
+}
+
+export function createUploadIntent(
+  apiRequest: ApiRequest,
+  projectId: string,
+  knowledgeBaseId: string,
+  file: File,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents/upload-intent`,
+    UploadIntentResponseSchema,
+    {
+      body: { filename: file.name, declaredMimeType: file.type, sizeBytes: file.size },
+      method: "POST",
+    },
+  );
+}
+
+export function completeUpload(
+  apiRequest: ApiRequest,
+  projectId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}/complete-upload`,
+    z.unknown(),
+    { method: "POST" },
+  );
+}
 
 export async function fetchProjects(
   apiRequest: ApiRequest,

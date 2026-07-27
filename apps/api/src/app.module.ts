@@ -17,6 +17,7 @@ import { ProjectsModule } from "./modules/projects/projects.module";
 import { SessionsModule } from "./modules/sessions/sessions.module";
 import { SystemModule } from "./modules/system/system.module";
 import { UsersModule } from "./modules/users/users.module";
+import { KnowledgeBasesModule } from "./modules/knowledge-bases/knowledge-bases.module";
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { UsersModule } from "./modules/users/users.module";
     SessionsModule,
     AuthModule,
     ProjectsModule,
+    KnowledgeBasesModule,
     HealthModule,
     SystemModule,
   ],

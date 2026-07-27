@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr = Field(default=SecretStr("replace-with-dev-secret-key"))
     log_level: LogLevel = Field(default="info")
     minio_endpoint: str = Field(default="http://localhost:9000")
+    minio_access_key: str = Field(default="dip_minio")
+    minio_bucket: str = Field(default="dip-documents")
+    minio_secret_key: SecretStr = Field(default=SecretStr("dip_minio_password"))
+    document_max_upload_bytes: int = Field(default=25_000_000, ge=1)
+    ingestion_internal_secret: SecretStr = Field(
+        default=SecretStr("replace-with-local-development-ingestion-secret-32")
+    )
     ollama_url: str = Field(default="http://localhost:11434")
     port: int = Field(default=8000, ge=1, le=65535)
     qdrant_url: str = Field(default="http://localhost:6333")
@@ -27,7 +34,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    @field_validator("ai_service_url", "langfuse_host", "ollama_url", "qdrant_url")
+    @field_validator(
+        "ai_service_url", "langfuse_host", "minio_endpoint", "ollama_url", "qdrant_url"
+    )
     @classmethod
     def validate_http_url(cls, value: str) -> str:
         parsed = urlparse(value)

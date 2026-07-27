@@ -5,6 +5,8 @@ export default function configuration() {
 
   return {
     aiService: {
+      ingestionSecret: env.INGESTION_INTERNAL_SECRET,
+      ingestionTimeoutMs: env.INGESTION_TIMEOUT_MS,
       url: env.AI_SERVICE_URL,
     },
     app: {
@@ -49,6 +51,19 @@ export default function configuration() {
     },
     queue: {
       connectionUrl: env.BULLMQ_CONNECTION_URL,
+    },
+    documents: {
+      allowedExtensions: env.DOCUMENT_ALLOWED_EXTENSIONS.split(",").map((extension) =>
+        extension.trim().toLowerCase(),
+      ),
+      maxUploadBytes: env.DOCUMENT_MAX_UPLOAD_BYTES,
+    },
+    storage: {
+      accessKey: env.MINIO_ACCESS_KEY,
+      bucket: env.MINIO_BUCKET,
+      endpoint: env.MINIO_ENDPOINT,
+      presignTtlSeconds: env.MINIO_PRESIGN_TTL_SECONDS,
+      secretKey: env.MINIO_SECRET_KEY,
     },
     rateLimit: {
       limit: env.RATE_LIMIT_LIMIT,

@@ -1,0 +1,2 @@
+Phase 3 smoke fixture.
+This document verifies direct upload, asynchronous ingestion, deterministic chunking, and Qdrant indexing.

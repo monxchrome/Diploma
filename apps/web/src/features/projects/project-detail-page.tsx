@@ -18,6 +18,7 @@ import {
   restoreProject,
   updateProject,
 } from "./projects-api";
+import { KnowledgeBasesPanel } from "./knowledge-bases-panel";
 
 const editProjectSchema = z.object({
   description: z.string().max(2000).optional(),
@@ -206,6 +207,7 @@ export function ProjectDetailPage({ projectId }: Readonly<{ projectId: string }>
                 </div>
               ))}
             </section>
+            <KnowledgeBasesPanel canEdit={canEdit} projectId={projectId} />
           </>
         ) : null}
       </div>

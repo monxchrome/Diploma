@@ -43,6 +43,13 @@ export const ApiEnvSchema = z
     BODY_LIMIT: z.string().default("1mb"),
     BULLMQ_CONNECTION_URL: z.string().url().default("redis://localhost:6379/1"),
     CORS_ORIGINS: z.string().default("http://localhost:3000"),
+    DOCUMENT_ALLOWED_EXTENSIONS: z.string().default("pdf,docx,txt,md,markdown,html,htm"),
+    DOCUMENT_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25_000_000),
+    INGESTION_INTERNAL_SECRET: z
+      .string()
+      .min(32)
+      .default("replace-with-local-development-ingestion-secret-32"),
+    INGESTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
     DATABASE_URL: z
       .string()
       .url()
@@ -58,6 +65,14 @@ export const ApiEnvSchema = z
     RATE_LIMIT_LIMIT: z.coerce.number().int().positive().default(120),
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     REDIS_URL: z.string().url().default("redis://localhost:6379/0"),
+    MINIO_ACCESS_KEY: z.string().min(3).default("dip_minio"),
+    MINIO_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("dip-documents"),
+    MINIO_ENDPOINT: HttpUrlSchema.default("http://localhost:9000"),
+    MINIO_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+    MINIO_SECRET_KEY: z.string().min(8).default("dip_minio_password"),
     REFRESH_TOKEN_PEPPER: z.string().min(32).default(DEFAULT_REFRESH_PEPPER),
     REFRESH_TOKEN_TTL: DurationSchema.default("30d"),
     SERVICE_NAME: z.string().min(1).default("api"),

@@ -49,6 +49,114 @@ export const ApiErrorSchema = z.object({
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
 
+export const KnowledgeBaseStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
+export const DocumentStatusSchema = z.enum([
+  "PENDING_UPLOAD",
+  "UPLOADED",
+  "QUEUED",
+  "VALIDATING",
+  "PARSING",
+  "CHUNKING",
+  "EMBEDDING",
+  "INDEXING",
+  "COMPLETED",
+  "FAILED",
+  "ARCHIVED",
+]);
+export const IngestionJobStatusSchema = z.enum([
+  "QUEUED",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
+export type KnowledgeBaseStatus = z.infer<typeof KnowledgeBaseStatusSchema>;
+export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
+
+export const KnowledgeBaseSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: KnowledgeBaseStatusSchema,
+  createdById: z.string().uuid(),
+  archivedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type KnowledgeBase = z.infer<typeof KnowledgeBaseSchema>;
+
+export const DocumentSchema = z.object({
+  id: z.string().uuid(),
+  knowledgeBaseId: z.string().uuid(),
+  originalFilename: z.string(),
+  displayName: z.string(),
+  status: DocumentStatusSchema,
+  mimeType: z.string().nullable(),
+  declaredMimeType: z.string(),
+  sizeBytes: z.string(),
+  currentVersionId: z.string().uuid().nullable(),
+  archivedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type Document = z.infer<typeof DocumentSchema>;
+
+export const IngestionJobSchema = z.object({
+  id: z.string().uuid(),
+  documentVersionId: z.string().uuid(),
+  status: IngestionJobStatusSchema,
+  attempt: z.number().int(),
+  progress: z.number().int(),
+  currentStage: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  queuedAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+});
+export type IngestionJob = z.infer<typeof IngestionJobSchema>;
+
+export const UploadIntentResponseSchema = z.object({
+  document: DocumentSchema,
+  documentVersionId: z.string().uuid(),
+  uploadUrl: z.string().url(),
+  uploadMethod: z.literal("PUT"),
+  requiredHeaders: z.record(z.string(), z.string()),
+  expiresAt: z.string().datetime(),
+});
+export type UploadIntentResponse = z.infer<typeof UploadIntentResponseSchema>;
+
+export const AiIngestionRequestSchema = z.object({
+  documentVersionId: z.string().uuid(),
+  ingestionJobId: z.string().uuid(),
+  storageKey: z.string().min(1).max(1024),
+  declaredMimeType: z.string().min(1).max(255),
+  requestId: z.string().min(1).max(128),
+});
+export const AiIngestionResponseSchema = z.object({
+  checksumSha256: z.string().length(64),
+  detectedMimeType: z.string(),
+  parserName: z.string(),
+  parserVersion: z.string(),
+  characterCount: z.number().int().nonnegative(),
+  tokenCount: z.number().int().nonnegative(),
+  embeddingModel: z.string(),
+  embeddingDimension: z.number().int().positive(),
+  chunks: z.array(
+    z.object({
+      content: z.string().min(1),
+      tokenCount: z.number().int().nonnegative(),
+      chunkIndex: z.number().int().nonnegative(),
+      contentHash: z.string().length(64),
+      vectorPointId: z.string().uuid(),
+      headingPath: z.array(z.string()),
+      metadata: z.record(z.string(), z.unknown()),
+    }),
+  ),
+});
+export type AiIngestionResponse = z.infer<typeof AiIngestionResponseSchema>;
+
 export const GlobalRoleSchema = z.enum(["USER", "ADMIN"]);
 export type GlobalRole = z.infer<typeof GlobalRoleSchema>;
 

@@ -3,6 +3,8 @@ export const ErrorCodes = {
   DuplicateResource: "DUPLICATE_RESOURCE",
   ExternalServiceError: "EXTERNAL_SERVICE_ERROR",
   InvalidCredentials: "INVALID_CREDENTIALS",
+  InvalidDocument: "INVALID_DOCUMENT",
+  UploadNotFound: "UPLOAD_NOT_FOUND",
   InternalServerError: "INTERNAL_SERVER_ERROR",
   NotFound: "NOT_FOUND",
   SessionInvalid: "SESSION_INVALID",

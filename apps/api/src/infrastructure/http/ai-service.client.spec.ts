@@ -1,4 +1,5 @@
 import type { HttpService } from "@nestjs/axios";
+import type { ConfigService } from "@nestjs/config";
 import type { AxiosResponse } from "axios";
 import { of, throwError } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
@@ -18,7 +19,7 @@ describe("AiServiceClient", () => {
         },
       } satisfies Partial<AxiosResponse>),
     );
-    const client = new AiServiceClient({ post } as unknown as HttpService);
+    const client = new AiServiceClient({ post } as unknown as HttpService, {} as ConfigService);
 
     await expect(client.echo("system-status", "req-1")).resolves.toMatchObject({
       requestId: "req-1",
@@ -34,7 +35,7 @@ describe("AiServiceClient", () => {
 
   it("maps downstream failures to service unavailable", async () => {
     const post = vi.fn().mockReturnValue(throwError(() => new Error("network")));
-    const client = new AiServiceClient({ post } as unknown as HttpService);
+    const client = new AiServiceClient({ post } as unknown as HttpService, {} as ConfigService);
 
     await expect(client.echo("system-status", "req-1")).rejects.toMatchObject({
       status: 503,

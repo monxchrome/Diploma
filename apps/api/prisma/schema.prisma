@@ -23,6 +23,33 @@ enum ProjectMemberRole {
   VIEWER
 }
 
+enum KnowledgeBaseStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum DocumentStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  QUEUED
+  VALIDATING
+  PARSING
+  CHUNKING
+  EMBEDDING
+  INDEXING
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
+
+enum IngestionJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -47,6 +74,8 @@ model User {
   ownedProjects   Project[]       @relation("ProjectOwner")
   memberships     ProjectMember[]
   auditLogs       AuditLog[]      @relation("AuditLogActor")
+  knowledgeBases  KnowledgeBase[] @relation("KnowledgeBaseCreator")
+  documents       Document[]      @relation("DocumentCreator")
 }
 
 model AuthSession {
@@ -80,10 +109,123 @@ model Project {
   owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members     ProjectMember[]
   auditLogs   AuditLog[]
+  knowledgeBases KnowledgeBase[]
 
   @@index([ownerId])
   @@index([archivedAt])
   @@index([createdAt])
+}
+
+model KnowledgeBase {
+  id          String              @id @default(uuid()) @db.Uuid
+  projectId   String              @db.Uuid
+  name        String
+  description String?
+  status      KnowledgeBaseStatus @default(ACTIVE)
+  createdById String              @db.Uuid
+  archivedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User                @relation("KnowledgeBaseCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  documents   Document[]
+
+  @@index([projectId, status, createdAt])
+  @@index([projectId, archivedAt])
+}
+
+model Document {
+  id              String         @id @default(uuid()) @db.Uuid
+  knowledgeBaseId String         @db.Uuid
+  originalFilename String
+  displayName     String
+  status          DocumentStatus @default(PENDING_UPLOAD)
+  mimeType        String?
+  declaredMimeType String
+  sizeBytes       BigInt
+  currentVersionId String?       @unique @db.Uuid
+  createdById     String         @db.Uuid
+  archivedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  knowledgeBase   KnowledgeBase  @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  createdBy       User           @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions        DocumentVersion[]
+  currentVersion  DocumentVersion? @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  @@index([knowledgeBaseId, status, createdAt])
+  @@index([knowledgeBaseId, archivedAt])
+}
+
+model DocumentVersion {
+  id                 String         @id @default(uuid()) @db.Uuid
+  documentId         String         @db.Uuid
+  version            Int
+  storageKey         String         @unique
+  checksumSha256     String?
+  detectedMimeType   String?
+  parserName         String?
+  parserVersion      String?
+  chunkerVersion     String?
+  embeddingProvider  String?
+  embeddingModel     String?
+  embeddingDimension Int?
+  pageCount          Int?
+  characterCount     Int?
+  tokenCount         Int?
+  status             DocumentStatus @default(PENDING_UPLOAD)
+  errorCode          String?
+  errorMessage       String?
+  createdAt          DateTime       @default(now())
+  completedAt        DateTime?
+  document           Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  activeForDocument  Document?      @relation("CurrentDocumentVersion")
+  chunks             DocumentChunk[]
+  ingestionJobs      IngestionJob[]
+
+  @@unique([documentId, version])
+  @@index([checksumSha256])
+  @@index([documentId, status, createdAt])
+}
+
+model DocumentChunk {
+  id                String          @id @default(uuid()) @db.Uuid
+  documentVersionId String          @db.Uuid
+  chunkIndex        Int
+  content           String
+  tokenCount        Int
+  pageStart         Int?
+  pageEnd           Int?
+  headingPath       Json            @default("[]")
+  metadata          Json            @default("{}")
+  vectorPointId     String          @unique
+  contentHash       String
+  createdAt         DateTime        @default(now())
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([documentVersionId, chunkIndex])
+  @@index([documentVersionId])
+}
+
+model IngestionJob {
+  id                String             @id @default(uuid()) @db.Uuid
+  documentVersionId String             @db.Uuid
+  bullJobId         String?
+  status            IngestionJobStatus @default(QUEUED)
+  attempt           Int                @default(0)
+  progress          Int                @default(0)
+  currentStage      String?
+  queuedAt          DateTime           @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  errorCode         String?
+  errorMessage      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  documentVersion   DocumentVersion    @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@index([documentVersionId, status, createdAt])
+  @@index([status, queuedAt])
 }
 
 model ProjectMember {

@@ -1,0 +1,10 @@
+﻿pnpm-lint=0
+pnpm-typecheck=1
+pnpm-test=0
+pnpm-build=0
+pnpm-db-generate=0
+prisma-validate=0
+docker-compose-config=0
+ruff-check=0
+pyright=1
+pytest=0

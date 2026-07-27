@@ -3,11 +3,21 @@ from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
+from app.api.routes.ingestions import router as ingestions_router
 from app.api.routes.system import router as system_router
 from app.core.config import get_settings
 from app.core.errors import RequestContextMiddleware, register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.infrastructure.langfuse import initialize_langfuse
+
+
+async def root() -> dict[str, str]:
+    return {
+        "service": get_settings().service_name,
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+    }
 
 
 def create_app() -> FastAPI:
@@ -34,8 +44,11 @@ def create_app() -> FastAPI:
     app.state.logger = logger
     app.state.langfuse = initialize_langfuse(settings)
 
+    app.add_api_route("/", root, include_in_schema=False, methods=["GET"])
+
     register_exception_handlers(app)
     app.include_router(health_router)
+    app.include_router(ingestions_router)
     app.include_router(system_router)
     return app
 

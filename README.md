@@ -8,7 +8,7 @@ Phase 1 implements infrastructure and a verifiable smoke flow:
 Next.js /api/status -> NestJS /api/system/status -> FastAPI /v1/system/echo -> JSON
 ```
 
-Phase 2 adds identity, access, sessions, profile management, and project management. It does not implement document ingestion, RAG, agents, billing, subscriptions, or analysis workflows.
+Phase 2 adds identity, access, sessions, profile management, and project management. Phase 3 adds project-scoped knowledge bases, private direct-to-MinIO document upload, and asynchronous ingestion; it does not implement query-time RAG, agents, billing, subscriptions, or analysis workflows.
 
 ## Architecture
 
@@ -60,6 +60,10 @@ REFRESH_TOKEN_PEPPER=replace-with-local-development-refresh-pepper-32
 AUTH_COOKIE_NAME=dip_refresh
 AUTH_COOKIE_SECURE=false
 AUTH_COOKIE_SAME_SITE=lax
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_BUCKET=dip-documents
+DOCUMENT_MAX_UPLOAD_BYTES=25000000
+INGESTION_INTERNAL_SECRET=replace-with-local-development-ingestion-secret-32
 ```
 
 Production must replace the JWT secret and refresh pepper, and must use secure cookie settings. `AUTH_COOKIE_SAME_SITE=none` requires `AUTH_COOKIE_SECURE=true`.
@@ -210,3 +214,6 @@ With PostgreSQL, Redis, web, and API running, register or sign in through `http:
 - If cookies are not set cross-site, confirm `credentials: include`, `AUTH_COOKIE_SAME_SITE`, `AUTH_COOKIE_SECURE`, and `AUTH_COOKIE_DOMAIN`.
 - If `/api/status` returns an upstream error, check that `apps/api` is running on port `3001` and `apps/ai-service` is running on port `8000`.
 - If optional Langfuse or Ollama services are slow to start, keep them in their Docker Compose profiles and run core checks first.
+- The `minio-init` service creates the private document bucket. If uploads return 404, run `docker compose up -d minio minio-init`.
+- Failed ingestion jobs retain sanitized status metadata in PostgreSQL; inspect `IngestionJob` rows or the BullMQ queue. Reprocessing creates a new immutable version in the next increment.
+- TXT, Markdown, HTML, DOCX, and PDF uploads are accepted. PDF completion currently requires a production Docling adapter. The development file scanner is structural validation, not malware scanning; production must configure a fail-closed scanner.
