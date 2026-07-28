@@ -27,6 +27,7 @@
     "infra:up": "docker compose up -d postgres redis qdrant minio",
     "lint": "corepack pnpm db:generate && turbo lint && cd apps/ai-service && python -m uv run ruff check .",
     "prisma:validate": "corepack pnpm --filter @dip/api prisma:validate",
+    "retrieval:reindex": "corepack pnpm --filter @dip/api retrieval:reindex",
     "test": "corepack pnpm db:generate && turbo test && cd apps/ai-service && python -m uv run pytest",
     "typecheck": "corepack pnpm db:generate && turbo typecheck && cd apps/ai-service && python -m uv run pyright"
   },

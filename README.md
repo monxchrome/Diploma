@@ -10,6 +10,8 @@ Next.js /api/status -> NestJS /api/system/status -> FastAPI /v1/system/echo -> J
 
 Phase 2 adds identity, access, sessions, profile management, and project management. Phase 3 adds project-scoped knowledge bases, private direct-to-MinIO document upload, and asynchronous ingestion; it does not implement query-time RAG, agents, billing, subscriptions, or analysis workflows.
 
+Phase 4 adds project-scoped dense, sparse, and hybrid retrieval plus grounded Q&A. There is no web search, tool calling, autonomous agent, or long-term agent memory.
+
 ## Architecture
 
 ```text
@@ -64,6 +66,12 @@ MINIO_ENDPOINT=http://localhost:9000
 MINIO_BUCKET=dip-documents
 DOCUMENT_MAX_UPLOAD_BYTES=25000000
 INGESTION_INTERNAL_SECRET=replace-with-local-development-ingestion-secret-32
+RETRIEVAL_CANDIDATE_LIMIT=40
+RETRIEVAL_TIMEOUT_SECONDS=20
+DENSE_WEIGHT=1
+SPARSE_WEIGHT=1
+RAG_GENERATION_ENABLED=false
+RAG_MODEL=llama3.2:3b
 ```
 
 Production must replace the JWT secret and refresh pepper, and must use secure cookie settings. `AUTH_COOKIE_SAME_SITE=none` requires `AUTH_COOKIE_SECURE=true`.
@@ -143,6 +151,9 @@ PATCH  /api/projects/:projectId
 DELETE /api/projects/:projectId
 POST   /api/projects/:projectId/restore
 GET    /api/projects/:projectId/members
+POST   /api/projects/:projectId/retrieval/search
+POST   /api/projects/:projectId/retrieval/ask
+POST   /api/projects/:projectId/retrieval/responses/:ragResponseId/feedback
 ```
 
 ## Commands
@@ -161,6 +172,7 @@ pnpm db:migrate
 pnpm db:generate
 pnpm db:studio
 pnpm healthcheck
+pnpm retrieval:reindex -- --dry-run --verify
 ```
 
 Auth/project checks are included in:
@@ -216,4 +228,6 @@ With PostgreSQL, Redis, web, and API running, register or sign in through `http:
 - If optional Langfuse or Ollama services are slow to start, keep them in their Docker Compose profiles and run core checks first.
 - The `minio-init` service creates the private document bucket. If uploads return 404, run `docker compose up -d minio minio-init`.
 - Failed ingestion jobs retain sanitized status metadata in PostgreSQL; inspect `IngestionJob` rows or the BullMQ queue. Reprocessing creates a new immutable version in the next increment.
+- Hybrid indexing uses `dip_document_chunks_v2` with named `dense` and `sparse` vectors. The v1 collection is not deleted. Reindex is idempotent and accepts `--project`, `--knowledge-base`, `--document`, `--batch-size`, `--resume`, `--force`, `--verify`, and `--dry-run`.
+- Sparse retrieval is a CPU-only local deterministic baseline. `RAG_GENERATION_ENABLED=false` keeps Ask extractive and grounded; enabling an Ollama model is an operational choice and does not enable tools or web access.
 - TXT, Markdown, HTML, DOCX, and PDF uploads are accepted. PDF completion currently requires a production Docling adapter. The development file scanner is structural validation, not malware scanning; production must configure a fail-closed scanner.

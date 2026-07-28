@@ -8,6 +8,7 @@ import type { Queue } from "bullmq";
 import { ErrorCodes } from "../../common/errors/error-codes";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { MinioService } from "../../infrastructure/storage/minio.service";
+import { AiServiceClient } from "../../infrastructure/http/ai-service.client";
 import { AuditService } from "../audit/audit.service";
 import { canArchiveProject, canUpdateProject } from "../projects/project-permissions";
 import {
@@ -34,6 +35,7 @@ export class KnowledgeBasesService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(MinioService) private readonly storage: MinioService,
+    @Inject(AiServiceClient) private readonly ai: AiServiceClient,
     @Inject(ConfigService) private readonly config: ConfigService,
     @InjectQueue("ingestion") private readonly queue: Queue,
   ) {}
@@ -105,6 +107,7 @@ export class KnowledgeBasesService {
     id: string;
     role: ProjectMemberRole;
     archived: boolean;
+    requestId: string;
   }) {
     if (!canArchiveProject(input.role))
       throw new NotFoundException({
@@ -112,15 +115,27 @@ export class KnowledgeBasesService {
         message: "Knowledge base not found",
       });
     await this.requireKnowledgeBase(input.projectId, input.id);
-    return knowledgeBaseDto(
-      await this.prisma.knowledgeBase.update({
-        where: { id: input.id },
-        data: {
-          status: input.archived ? KnowledgeBaseStatus.ARCHIVED : KnowledgeBaseStatus.ACTIVE,
-          archivedAt: input.archived ? new Date() : null,
-        },
-      }),
+    const currentVersions = await this.prisma.documentVersion.findMany({
+      where: {
+        document: { knowledgeBaseId: input.id, currentVersionId: { not: null }, archivedAt: null },
+        status: DocumentStatus.COMPLETED,
+      },
+      select: { id: true },
+    });
+    await this.ai.archiveKnowledgeBase(
+      input.id,
+      currentVersions.map((version) => version.id),
+      input.archived,
+      input.requestId,
     );
+    const updated = await this.prisma.knowledgeBase.update({
+      where: { id: input.id },
+      data: {
+        status: input.archived ? KnowledgeBaseStatus.ARCHIVED : KnowledgeBaseStatus.ACTIVE,
+        archivedAt: input.archived ? new Date() : null,
+      },
+    });
+    return knowledgeBaseDto(updated);
   }
   async createUploadIntent(input: {
     projectId: string;

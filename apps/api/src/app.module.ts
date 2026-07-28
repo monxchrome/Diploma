@@ -18,6 +18,7 @@ import { SessionsModule } from "./modules/sessions/sessions.module";
 import { SystemModule } from "./modules/system/system.module";
 import { UsersModule } from "./modules/users/users.module";
 import { KnowledgeBasesModule } from "./modules/knowledge-bases/knowledge-bases.module";
+import { RetrievalModule } from "./modules/retrieval/retrieval.module";
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { KnowledgeBasesModule } from "./modules/knowledge-bases/knowledge-bases.
     AuthModule,
     ProjectsModule,
     KnowledgeBasesModule,
+    RetrievalModule,
     HealthModule,
     SystemModule,
   ],

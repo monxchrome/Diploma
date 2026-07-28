@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
 from app.api.routes.ingestions import router as ingestions_router
+from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.system import router as system_router
 from app.core.config import get_settings
 from app.core.errors import RequestContextMiddleware, register_exception_handlers
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(ingestions_router)
+    app.include_router(retrieval_router)
     app.include_router(system_router)
     return app
 

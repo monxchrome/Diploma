@@ -18,7 +18,7 @@ export class IngestionProcessor extends WorkerHost {
   async process(job: Job<{ ingestionJobId: string; requestId: string }>): Promise<void> {
     const record = await this.prisma.ingestionJob.findUnique({
       where: { id: job.data.ingestionJobId },
-      include: { documentVersion: { include: { document: true } } },
+      include: { documentVersion: { include: { document: { include: { knowledgeBase: true } } } } },
     });
     if (!record || record.status === IngestionJobStatus.COMPLETED) return;
     await this.prisma.$transaction([
@@ -48,13 +48,27 @@ export class IngestionProcessor extends WorkerHost {
         ingestionJobId: record.id,
         requestId: job.data.requestId,
         storageKey: record.documentVersion.storageKey,
+        indexContext: {
+          createdAt: record.documentVersion.createdAt.toISOString(),
+          documentId: record.documentVersion.documentId,
+          documentStatus: "COMPLETED",
+          documentVersion: record.documentVersion.version,
+          documentVersionId: record.documentVersionId,
+          knowledgeBaseId: record.documentVersion.document.knowledgeBaseId,
+          projectId: record.documentVersion.document.knowledgeBase.projectId,
+        },
       });
+      const priorVersionId = record.documentVersion.document.currentVersionId;
+      if (priorVersionId && priorVersionId !== record.documentVersionId) {
+        await this.ai.deactivateDocumentVersion(priorVersionId, job.data.requestId);
+      }
       await this.prisma.$transaction(async (tx) => {
         await tx.documentChunk.deleteMany({
           where: { documentVersionId: record.documentVersionId },
         });
         await tx.documentChunk.createMany({
           data: response.chunks.map((chunk) => ({
+            id: chunk.vectorPointId,
             documentVersionId: record.documentVersionId,
             chunkIndex: chunk.chunkIndex,
             content: chunk.content,

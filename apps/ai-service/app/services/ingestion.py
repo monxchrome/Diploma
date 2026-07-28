@@ -76,9 +76,11 @@ def inspect_and_parse(path: Path, declared_mime_type: str) -> ParsedDocument:
     return ParsedDocument(detected, "safe-text", normalize_text(raw))
 
 
-def build_response(path: Path, declared_mime_type: str) -> AiIngestionResponse:
+def build_response(
+    path: Path, declared_mime_type: str, document_version_id: str
+) -> AiIngestionResponse:
     parsed = inspect_and_parse(path, declared_mime_type)
-    chunks = chunk_text(parsed.text)
+    chunks = chunk_text(parsed.text, document_version_id=document_version_id)
     if not chunks:
         raise ValueError("The document does not contain indexable text")
     checksum = _sha256_file(path)
@@ -95,7 +97,9 @@ def build_response(path: Path, declared_mime_type: str) -> AiIngestionResponse:
     )
 
 
-def chunk_text(text: str, limit: int = 1_200, overlap: int = 160) -> list[IngestionChunk]:
+def chunk_text(
+    text: str, document_version_id: str = "legacy", limit: int = 1_200, overlap: int = 160
+) -> list[IngestionChunk]:
     words = text.split()
     chunks: list[IngestionChunk] = []
     start = 0
@@ -110,7 +114,12 @@ def chunk_text(text: str, limit: int = 1_200, overlap: int = 160) -> list[Ingest
                     tokenCount=len(content.split()),
                     chunkIndex=len(chunks),
                     contentHash=content_hash,
-                    vectorPointId=str(uuid.uuid5(uuid.NAMESPACE_URL, content_hash)),
+                    vectorPointId=str(
+                        uuid.uuid5(
+                            uuid.NAMESPACE_URL,
+                            f"{document_version_id}:{len(chunks)}:{content_hash}",
+                        )
+                    ),
                     headingPath=[],
                     metadata={"chunkerVersion": "v1"},
                 )

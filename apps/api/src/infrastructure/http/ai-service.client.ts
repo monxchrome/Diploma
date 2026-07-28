@@ -3,6 +3,7 @@ import {
   AiEchoResponseSchema,
   AiIngestionRequestSchema,
   AiIngestionResponseSchema,
+  SearchRequestSchema,
   type AiEchoResponse,
   type AiIngestionResponse,
 } from "@dip/contracts";
@@ -48,6 +49,15 @@ export class AiServiceClient {
     ingestionJobId: string;
     requestId: string;
     storageKey: string;
+    indexContext: {
+      createdAt: string;
+      documentId: string;
+      documentStatus: "COMPLETED";
+      documentVersion: number;
+      documentVersionId: string;
+      knowledgeBaseId: string;
+      projectId: string;
+    };
   }): Promise<AiIngestionResponse> {
     const request = AiIngestionRequestSchema.parse(payload);
     try {
@@ -63,6 +73,99 @@ export class AiServiceClient {
         }),
       );
       return AiIngestionResponseSchema.parse(response.data);
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
+  async retrieve(payload: {
+    filters: unknown;
+    generateAnswer: boolean;
+    mode: "DENSE" | "SPARSE" | "HYBRID";
+    projectId: string;
+    query: string;
+    requestId: string;
+    topK: number;
+  }): Promise<unknown> {
+    const request = SearchRequestSchema.parse({
+      filters: payload.filters,
+      mode: payload.mode,
+      query: payload.query,
+      topK: payload.topK,
+    });
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<unknown>(
+          "/v1/internal/retrieval",
+          { ...request, generateAnswer: payload.generateAnswer, projectId: payload.projectId },
+          {
+            headers: {
+              [REQUEST_ID_HEADER]: payload.requestId,
+              "x-internal-service-secret": this.config.getOrThrow<string>(
+                "aiService.ingestionSecret",
+              ),
+            },
+            timeout: this.config.getOrThrow<number>("aiService.ingestionTimeoutMs"),
+          },
+        ),
+      );
+      return response.data;
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
+  async deactivateDocumentVersion(documentVersionId: string, requestId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.httpService.post(
+          "/v1/internal/document-versions/deactivate",
+          { documentVersionId },
+          {
+            headers: {
+              [REQUEST_ID_HEADER]: requestId,
+              "x-internal-service-secret": this.config.getOrThrow<string>(
+                "aiService.ingestionSecret",
+              ),
+            },
+          },
+        ),
+      );
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
+  async archiveKnowledgeBase(
+    knowledgeBaseId: string,
+    documentVersionIds: string[],
+    archived: boolean,
+    requestId: string,
+  ): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.httpService.post(
+          "/v1/internal/knowledge-bases/archive",
+          { archived, documentVersionIds, knowledgeBaseId },
+          {
+            headers: {
+              [REQUEST_ID_HEADER]: requestId,
+              "x-internal-service-secret": this.config.getOrThrow<string>(
+                "aiService.ingestionSecret",
+              ),
+            },
+          },
+        ),
+      );
     } catch (error) {
       throw new ServiceUnavailableException({
         code: ErrorCodes.ExternalServiceError,

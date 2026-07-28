@@ -133,6 +133,15 @@ export const AiIngestionRequestSchema = z.object({
   storageKey: z.string().min(1).max(1024),
   declaredMimeType: z.string().min(1).max(255),
   requestId: z.string().min(1).max(128),
+  indexContext: z.object({
+    createdAt: z.string().datetime(),
+    documentId: z.string().uuid(),
+    documentStatus: z.literal("COMPLETED"),
+    documentVersion: z.number().int().positive(),
+    documentVersionId: z.string().uuid(),
+    knowledgeBaseId: z.string().uuid(),
+    projectId: z.string().uuid(),
+  }),
 });
 export const AiIngestionResponseSchema = z.object({
   checksumSha256: z.string().length(64),
@@ -152,6 +161,8 @@ export const AiIngestionResponseSchema = z.object({
       vectorPointId: z.string().uuid(),
       headingPath: z.array(z.string()),
       metadata: z.record(z.string(), z.unknown()),
+      pageEnd: z.number().int().nullable(),
+      pageStart: z.number().int().nullable(),
     }),
   ),
 });
@@ -287,3 +298,73 @@ export const AnalysisEventNameSchema = z.enum([
   "analysis.failed",
 ]);
 export type AnalysisEventName = z.infer<typeof AnalysisEventNameSchema>;
+
+export const RetrievalModeSchema = z.enum(["DENSE", "SPARSE", "HYBRID"]);
+export type RetrievalMode = z.infer<typeof RetrievalModeSchema>;
+
+export const RetrievalFiltersSchema = z.object({
+  createdAfter: z.string().datetime().optional(),
+  createdBefore: z.string().datetime().optional(),
+  documentIds: z.array(z.string().uuid()).max(50).optional(),
+  knowledgeBaseIds: z.array(z.string().uuid()).max(50).optional(),
+  pageEnd: z.number().int().positive().optional(),
+  pageStart: z.number().int().positive().optional(),
+});
+export type RetrievalFilters = z.infer<typeof RetrievalFiltersSchema>;
+
+export const SearchRequestSchema = z.object({
+  filters: RetrievalFiltersSchema.default({}),
+  mode: RetrievalModeSchema.default("HYBRID"),
+  query: z.string().min(1).max(4000),
+  topK: z.number().int().min(1).max(50).default(10),
+});
+export type SearchRequest = z.infer<typeof SearchRequestSchema>;
+
+export const RetrievalEvidenceSchema = z.object({
+  chunkId: z.string().uuid(),
+  documentId: z.string().uuid(),
+  documentVersionId: z.string().uuid(),
+  evidenceId: z.string().min(1),
+  headingPath: z.array(z.string()),
+  knowledgeBaseId: z.string().uuid(),
+  pageEnd: z.number().int().nullable(),
+  pageStart: z.number().int().nullable(),
+  score: z.number(),
+  snippet: z.string(),
+});
+export type RetrievalEvidence = z.infer<typeof RetrievalEvidenceSchema>;
+
+export const SearchResponseSchema = z.object({
+  evidence: z.array(RetrievalEvidenceSchema),
+  normalizedQuery: z.string(),
+  retrievalRunId: z.string().uuid(),
+  timingsMs: z.record(z.string(), z.number().nonnegative()),
+});
+export type SearchResponse = z.infer<typeof SearchResponseSchema>;
+
+export const CitationSchema = z.object({
+  documentId: z.string().uuid(),
+  evidenceId: z.string().min(1),
+  quote: z.string().min(1),
+});
+export type Citation = z.infer<typeof CitationSchema>;
+
+export const AskRequestSchema = SearchRequestSchema.extend({
+  stream: z.boolean().default(false),
+});
+export type AskRequest = z.infer<typeof AskRequestSchema>;
+
+export const AskResponseSchema = SearchResponseSchema.extend({
+  answer: z.string(),
+  citations: z.array(CitationSchema),
+  insufficientEvidence: z.boolean(),
+  missingInformation: z.array(z.string()),
+  ragResponseId: z.string().uuid(),
+});
+export type AskResponse = z.infer<typeof AskResponseSchema>;
+
+export const AnswerFeedbackRequestSchema = z.object({
+  comment: z.string().trim().max(2000).optional(),
+  rating: z.number().int().min(1).max(5),
+});
+export type AnswerFeedbackRequest = z.infer<typeof AnswerFeedbackRequestSchema>;

@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EnvironmentName = Literal["development", "test", "staging", "production"]
@@ -27,9 +27,34 @@ class Settings(BaseSettings):
     ingestion_internal_secret: SecretStr = Field(
         default=SecretStr("replace-with-local-development-ingestion-secret-32")
     )
-    ollama_url: str = Field(default="http://localhost:11434")
+    ollama_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "OLLAMA_URL"),
+    )
     port: int = Field(default=8000, ge=1, le=65535)
     qdrant_url: str = Field(default="http://localhost:6333")
+    retrieval_candidate_limit: int = Field(default=40, ge=1, le=200)
+    retrieval_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    retrieval_score_threshold: float = Field(default=0.015, ge=0, le=1)
+    rerank_score_threshold: float = Field(
+        default=0.04, ge=0, le=1, validation_alias="RERANK_SCORE_THRESHOLD"
+    )
+    min_relevant_evidence_count: int = Field(
+        default=1, ge=1, le=10, validation_alias="MIN_RELEVANT_EVIDENCE_COUNT"
+    )
+    reranker_enabled: bool = Field(default=True, validation_alias="RERANKER_ENABLED")
+    reranker_model: str = Field(default="lexical-v1", validation_alias="RERANKER_MODEL")
+    dense_weight: float = Field(default=1.0, gt=0, le=10)
+    sparse_weight: float = Field(default=1.0, gt=0, le=10)
+    rag_generation_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_ENABLED", "RAG_GENERATION_ENABLED"),
+    )
+    rag_provider: str = Field(default="ollama", validation_alias="RAG_PROVIDER")
+    rag_model: str = Field(
+        default="llama3.2:3b",
+        validation_alias=AliasChoices("OLLAMA_RAG_MODEL", "RAG_MODEL"),
+    )
     service_name: str = Field(default="ai-service", min_length=1)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

@@ -67,15 +67,29 @@ export class KnowledgeBasesController {
     @CurrentProjectAccess() access: ProjectAccess,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("knowledgeBaseId", ParseUUIDPipe) id: string,
+    @Req() request: Request,
   ) {
-    return this.service.archive({ archived: true, id, projectId, role: access.role });
+    return this.service.archive({
+      archived: true,
+      id,
+      projectId,
+      requestId: getRequestId(request),
+      role: access.role,
+    });
   }
   @Post(":knowledgeBaseId/restore") restore(
     @CurrentProjectAccess() access: ProjectAccess,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("knowledgeBaseId", ParseUUIDPipe) id: string,
+    @Req() request: Request,
   ) {
-    return this.service.archive({ archived: false, id, projectId, role: access.role });
+    return this.service.archive({
+      archived: false,
+      id,
+      projectId,
+      requestId: getRequestId(request),
+      role: access.role,
+    });
   }
   @Post(":knowledgeBaseId/documents/upload-intent") intent(
     @CurrentUser() user: AuthenticatedUser,

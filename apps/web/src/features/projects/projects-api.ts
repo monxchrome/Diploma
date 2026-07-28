@@ -7,6 +7,10 @@ import {
   ProjectSummarySchema,
   SafeUserSchema,
   SystemStatusResponseSchema,
+  AskResponseSchema,
+  SearchResponseSchema,
+  type AskResponse,
+  type SearchResponse,
   UploadIntentResponseSchema,
   type AuthSessionSummary,
   type PaginatedResponse,
@@ -28,6 +32,52 @@ export const KnowledgeBasesSchema = z.array(KnowledgeBaseSchema);
 
 export function fetchKnowledgeBases(apiRequest: ApiRequest, projectId: string) {
   return apiRequest(`/api/projects/${projectId}/knowledge-bases`, KnowledgeBasesSchema);
+}
+
+export function searchProject(
+  apiRequest: ApiRequest,
+  projectId: string,
+  input: { knowledgeBaseIds?: string[]; mode: "DENSE" | "SPARSE" | "HYBRID"; query: string },
+): Promise<SearchResponse> {
+  return apiRequest(`/api/projects/${projectId}/retrieval/search`, SearchResponseSchema, {
+    body: {
+      filters: { knowledgeBaseIds: input.knowledgeBaseIds ?? [] },
+      mode: input.mode,
+      query: input.query,
+    },
+    method: "POST",
+  });
+}
+
+export function askProject(
+  apiRequest: ApiRequest,
+  projectId: string,
+  input: { knowledgeBaseIds?: string[]; mode: "DENSE" | "SPARSE" | "HYBRID"; query: string },
+): Promise<AskResponse> {
+  return apiRequest(`/api/projects/${projectId}/retrieval/ask`, AskResponseSchema, {
+    body: {
+      filters: { knowledgeBaseIds: input.knowledgeBaseIds ?? [] },
+      mode: input.mode,
+      query: input.query,
+    },
+    method: "POST",
+  });
+}
+
+export function sendAnswerFeedback(
+  apiRequest: ApiRequest,
+  projectId: string,
+  ragResponseId: string,
+  rating: number,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/retrieval/responses/${ragResponseId}/feedback`,
+    z.unknown(),
+    {
+      body: { rating },
+      method: "POST",
+    },
+  );
 }
 
 export function createKnowledgeBase(apiRequest: ApiRequest, projectId: string, name: string) {

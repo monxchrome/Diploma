@@ -11,6 +11,7 @@
     "dev": "tsx watch src/main.ts",
     "lint": "eslint .",
     "prisma:validate": "prisma validate",
+    "retrieval:reindex": "tsx src/scripts/retrieval-reindex.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
