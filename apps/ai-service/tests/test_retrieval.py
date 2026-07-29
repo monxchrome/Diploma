@@ -116,6 +116,7 @@ async def test_available_chat_provider_prevents_chunk_concatenation(
 
 async def test_unrelated_query_returns_insufficient_evidence_and_no_citations() -> None:
     from app.core.config import Settings
+
     answer, citations, insufficient, missing = await generate_grounded_answer(
         "Who is the CEO and what is their phone number?", [], Settings()
     )

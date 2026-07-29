@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
+from app.graphs.analysis_graph import build_analysis_graph
 from app.schemas.contracts import HealthResponse, ServiceStatus
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -29,4 +30,10 @@ async def live(settings: SettingsDependency) -> HealthResponse:
 
 @router.get("/ready", response_model=HealthResponse)
 async def ready(settings: SettingsDependency) -> HealthResponse:
+    return _health(settings)
+
+
+@router.get("/agents", response_model=HealthResponse)
+async def agents(settings: SettingsDependency) -> HealthResponse:
+    build_analysis_graph()
     return _health(settings)

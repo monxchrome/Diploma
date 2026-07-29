@@ -12,6 +12,8 @@ Phase 2 adds identity, access, sessions, profile management, and project managem
 
 Phase 4 adds project-scoped dense, sparse, and hybrid retrieval plus grounded Q&A. There is no web search, tool calling, autonomous agent, or long-term agent memory.
 
+Phase 5 adds a bounded, asynchronous decision-analysis engine. A decision analysis uses the existing project-scoped retrieval boundary, then executes either a single-agent baseline or a fixed LangGraph workflow with allowlisted market, financial, legal/regulatory, risk, and strategy specialists. The graph persists sanitized checkpoints and validates citations before an immutable report is stored. It supports queued-run cancellation and idempotent BullMQ redelivery; it does not add public web search, arbitrary tools, external actions, or agent memory.
+
 ## Architecture
 
 ```text
@@ -154,6 +156,11 @@ GET    /api/projects/:projectId/members
 POST   /api/projects/:projectId/retrieval/search
 POST   /api/projects/:projectId/retrieval/ask
 POST   /api/projects/:projectId/retrieval/responses/:ragResponseId/feedback
+POST   /api/projects/:projectId/analyses
+GET    /api/projects/:projectId/analyses
+GET    /api/projects/:projectId/analyses/:analysisId
+POST   /api/projects/:projectId/analyses/:analysisId/run
+POST   /api/projects/:projectId/analyses/:analysisId/cancel
 ```
 
 ## Commands

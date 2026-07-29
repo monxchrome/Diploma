@@ -55,6 +55,46 @@ class Settings(BaseSettings):
         default="llama3.2:3b",
         validation_alias=AliasChoices("OLLAMA_RAG_MODEL", "RAG_MODEL"),
     )
+    agent_planner_provider: str = Field(default="ollama", validation_alias="AGENT_PLANNER_PROVIDER")
+    agent_planner_model: str = Field(default="llama3.2:3b", validation_alias="AGENT_PLANNER_MODEL")
+    agent_planner_max_tokens: int = Field(
+        default=1000, ge=128, le=16000, validation_alias="AGENT_PLANNER_MAX_TOKENS"
+    )
+    agent_specialist_provider: str = Field(
+        default="ollama", validation_alias="AGENT_SPECIALIST_PROVIDER"
+    )
+    agent_specialist_model: str = Field(
+        default="llama3.2:3b", validation_alias="AGENT_SPECIALIST_MODEL"
+    )
+    agent_specialist_max_tokens: int = Field(
+        default=1600, ge=128, le=16000, validation_alias="AGENT_SPECIALIST_MAX_TOKENS"
+    )
+    agent_coordinator_provider: str = Field(
+        default="ollama", validation_alias="AGENT_COORDINATOR_PROVIDER"
+    )
+    agent_coordinator_model: str = Field(
+        default="llama3.2:3b", validation_alias="AGENT_COORDINATOR_MODEL"
+    )
+    agent_coordinator_max_tokens: int = Field(
+        default=4000, ge=128, le=16000, validation_alias="AGENT_COORDINATOR_MAX_TOKENS"
+    )
+    agent_critic_provider: str = Field(default="ollama", validation_alias="AGENT_CRITIC_PROVIDER")
+    agent_critic_model: str = Field(default="llama3.2:3b", validation_alias="AGENT_CRITIC_MODEL")
+    agent_critic_max_tokens: int = Field(
+        default=1000, ge=128, le=16000, validation_alias="AGENT_CRITIC_MAX_TOKENS"
+    )
+    agent_model_timeout_seconds: float = Field(
+        default=120.0, gt=0, le=600, validation_alias="AGENT_MODEL_TIMEOUT_SECONDS"
+    )
+    analysis_min_quality_score: float = Field(
+        default=0.7, ge=0, le=1, validation_alias="ANALYSIS_MIN_QUALITY_SCORE"
+    )
+    analysis_min_grounding_score: float = Field(
+        default=0.7, ge=0, le=1, validation_alias="ANALYSIS_MIN_GROUNDING_SCORE"
+    )
+    analysis_allow_degraded_report: bool = Field(
+        default=True, validation_alias="ANALYSIS_ALLOW_DEGRADED_REPORT"
+    )
     service_name: str = Field(default="ai-service", min_length=1)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

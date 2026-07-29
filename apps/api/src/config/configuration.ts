@@ -4,6 +4,27 @@ export default function configuration() {
   const env = loadApiEnv();
 
   return {
+    analysis: {
+      checkpointRetentionDays: env.ANALYSIS_CHECKPOINT_RETENTION_DAYS,
+      graphVersion: env.ANALYSIS_GRAPH_VERSION,
+      jobAttempts: env.ANALYSIS_JOB_ATTEMPTS,
+      jobTimeoutMs: env.ANALYSIS_JOB_TIMEOUT_MS,
+      maxConcurrentPerProject: env.ANALYSIS_MAX_CONCURRENT_PER_PROJECT,
+      maxConcurrentPerUser: env.ANALYSIS_MAX_CONCURRENT_PER_USER,
+      maxDurationSeconds: env.ANALYSIS_MAX_DURATION_SECONDS,
+      maxEvidencePerSpecialist: env.ANALYSIS_MAX_EVIDENCE_PER_SPECIALIST,
+      maxRetrievalQueries: env.ANALYSIS_MAX_RETRIEVAL_QUERIES,
+      maxRevisions: env.ANALYSIS_MAX_REVISIONS,
+      maxSpecialists: env.ANALYSIS_MAX_SPECIALISTS,
+      maxTotalContextTokens: env.ANALYSIS_MAX_TOTAL_CONTEXT_TOKENS,
+      maxTotalOutputTokens: env.ANALYSIS_MAX_TOTAL_OUTPUT_TOKENS,
+      minQualityScore: env.ANALYSIS_MIN_QUALITY_SCORE,
+      minGroundingScore: env.ANALYSIS_MIN_GROUNDING_SCORE,
+      allowDegradedReport: env.ANALYSIS_ALLOW_DEGRADED_REPORT,
+      queueConcurrency: env.ANALYSIS_QUEUE_CONCURRENCY,
+      queueName: env.ANALYSIS_QUEUE_NAME,
+      rateLimit: env.ANALYSIS_RATE_LIMIT,
+    },
     aiService: {
       ingestionSecret: env.INGESTION_INTERNAL_SECRET,
       ingestionTimeoutMs: env.INGESTION_TIMEOUT_MS,

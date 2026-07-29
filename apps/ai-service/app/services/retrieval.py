@@ -221,14 +221,23 @@ def filter_relevant_candidates(
     query: str, candidates: list[RankedCandidate], settings: Settings
 ) -> list[RankedCandidate]:
     query_tokens = set(TOKEN_RE.findall(query.casefold())) - {
-        "a", "an", "and", "are", "how", "is", "of", "or", "the", "their", "what", "who"
+        "a",
+        "an",
+        "and",
+        "are",
+        "how",
+        "is",
+        "of",
+        "or",
+        "the",
+        "their",
+        "what",
+        "who",
     }
     required_overlap = 2 if len(query_tokens) >= 3 else 1
     relevant = []
     for candidate in candidates:
-        content_tokens = set(
-            TOKEN_RE.findall(str(candidate.payload.get("content", "")).casefold())
-        )
+        content_tokens = set(TOKEN_RE.findall(str(candidate.payload.get("content", "")).casefold()))
         overlap = len(query_tokens & content_tokens)
         if overlap < required_overlap or candidate.score < settings.rerank_score_threshold:
             continue
@@ -297,11 +306,21 @@ def sectioned_fallback(evidence: list[RetrievalEvidence]) -> str:
     sections = {
         "Entry plan": ("pilot", "Barcelona", "launch", "entry"),
         "Financial targets": (
-            "budget", "allocation", "acquisition", "break-even", "revenue", "customer"
+            "budget",
+            "allocation",
+            "acquisition",
+            "break-even",
+            "revenue",
+            "customer",
         ),
         "Legal requirements": ("GDPR", "legal", "consumer", "employment", "tax", "data"),
         "Expansion conditions": (
-            "nationwide", "expand", "demand", "successful", "six months", "postponed"
+            "nationwide",
+            "expand",
+            "demand",
+            "successful",
+            "six months",
+            "postponed",
         ),
     }
     rendered: list[str] = []
@@ -316,9 +335,7 @@ def sectioned_fallback(evidence: list[RetrievalEvidence]) -> str:
         else:
             body = " ".join(f"{statement} [{evidence_id}]" for statement, evidence_id in statements)
         rendered.append(f"{title}\n{body}".strip())
-    return (
-        "\n\n".join(rendered)
-    )
+    return "\n\n".join(rendered)
 
 
 def _section_statements(snippet: str, keywords: tuple[str, ...]) -> list[str]:

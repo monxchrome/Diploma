@@ -9,6 +9,7 @@ import {
 } from "@dip/contracts";
 import { HttpService } from "@nestjs/axios";
 import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { isAxiosError } from "axios";
 import { firstValueFrom } from "rxjs";
 
 import { ErrorCodes } from "../../common/errors/error-codes";
@@ -121,6 +122,28 @@ export class AiServiceClient {
     }
   }
 
+  async analyze(payload: unknown, requestId: string): Promise<unknown> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<unknown>("/v1/internal/analyses", payload, {
+          headers: {
+            [REQUEST_ID_HEADER]: requestId,
+            "x-internal-service-secret": this.config.getOrThrow<string>(
+              "aiService.ingestionSecret",
+            ),
+          },
+          timeout: this.config.getOrThrow<number>("analysis.jobTimeoutMs"),
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
   async deactivateDocumentVersion(documentVersionId: string, requestId: string): Promise<void> {
     try {
       await firstValueFrom(
@@ -175,10 +198,26 @@ export class AiServiceClient {
   }
 
   private formatError(error: unknown): string {
+    if (isAxiosError<unknown>(error)) {
+      const data: unknown = error.response?.data;
+      const detail = this.isRecord(data) ? data["detail"] : undefined;
+      if (
+        this.isRecord(detail) &&
+        typeof detail["code"] === "string" &&
+        typeof detail["message"] === "string"
+      ) {
+        return `${detail["code"]}: ${detail["message"]}`;
+      }
+    }
+
     if (error instanceof Error) {
       return error.message;
     }
 
     return "AI service request failed";
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
   }
 }

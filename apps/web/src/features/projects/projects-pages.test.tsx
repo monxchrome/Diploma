@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AnalysisRunViewPage } from "./analysis-detail-page";
 import { NewProjectPage } from "./project-form-page";
 import { ProjectsListPage } from "./projects-list-page";
 
@@ -13,7 +14,9 @@ const routerMock = vi.hoisted(() => ({
 const projectsApiMock = vi.hoisted(() => ({
   archiveProject: vi.fn(),
   createProject: vi.fn(),
+  fetchAnalysis: vi.fn(),
   fetchProjects: vi.fn(),
+  runAnalysis: vi.fn(),
   restoreProject: vi.fn(),
 }));
 
@@ -40,8 +43,10 @@ describe("project pages", () => {
     routerMock.push.mockReset();
     projectsApiMock.archiveProject.mockReset();
     projectsApiMock.createProject.mockReset();
+    projectsApiMock.fetchAnalysis.mockReset();
     projectsApiMock.fetchProjects.mockReset();
     projectsApiMock.restoreProject.mockReset();
+    projectsApiMock.runAnalysis.mockReset();
   });
 
   afterEach(() => {
@@ -107,6 +112,68 @@ describe("project pages", () => {
       );
     });
     expect(routerMock.push).toHaveBeenCalledWith("/projects/00000000-0000-4000-8000-000000000010");
+  });
+
+  it("shows a prominent warning for a report that failed the quality gate", async () => {
+    const timestamp = new Date().toISOString();
+    projectsApiMock.fetchAnalysis.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000020",
+      projectId: "00000000-0000-4000-8000-000000000010",
+      title: "Spain expansion",
+      decisionQuestion: "Should we expand?",
+      objectives: [],
+      constraints: [],
+      assumptions: [],
+      timeHorizon: null,
+      targetMarket: "Spain",
+      currency: "EUR",
+      knowledgeBaseIds: [],
+      documentIds: [],
+      mode: "MULTI_AGENT",
+      requestedSpecialists: [],
+      additionalContext: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      runs: [
+        {
+          id: "00000000-0000-4000-8000-000000000030",
+          status: "COMPLETED_WITH_LIMITATIONS",
+          progress: 100,
+          currentStage: "finalize_report",
+          errorMessage: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          startedAt: timestamp,
+          completedAt: timestamp,
+          agentRuns: [],
+          report: {
+            citations: [],
+            report: {
+              recommendation: "Use staged expansion.",
+              executiveSummary: "Quality remains below the configured threshold.",
+              sections: [],
+              qualityScore: 0.25,
+              groundingScore: 1,
+              insufficientEvidence: true,
+              qualityGatePassed: false,
+              limitations: ["Quality 0.25 is below the configured minimum 0.70."],
+            },
+          },
+        },
+      ],
+    });
+
+    renderWithQuery(
+      <AnalysisRunViewPage
+        analysisId="00000000-0000-4000-8000-000000000020"
+        projectId="00000000-0000-4000-8000-000000000010"
+        view="report"
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Quality gate warning");
+    expect(screen.getByText("Completed with limitations")).toBeInTheDocument();
+    expect(screen.getByText("Quality: 25%")).toBeInTheDocument();
   });
 });
 

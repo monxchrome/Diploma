@@ -32,3 +32,27 @@ def test_rag_environment_aliases_and_precedence(monkeypatch: pytest.MonkeyPatch)
     assert settings.rag_provider == "ollama"
     assert settings.rag_model == "preferred-model"
     assert settings.ollama_url == "http://ollama:11434"
+
+
+def test_phase_five_agent_model_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENT_PLANNER_PROVIDER", "ollama")
+    monkeypatch.setenv("AGENT_PLANNER_MODEL", "planner-model")
+    monkeypatch.setenv("AGENT_SPECIALIST_PROVIDER", "ollama")
+    monkeypatch.setenv("AGENT_SPECIALIST_MODEL", "specialist-model")
+    monkeypatch.setenv("AGENT_COORDINATOR_PROVIDER", "ollama")
+    monkeypatch.setenv("AGENT_COORDINATOR_MODEL", "coordinator-model")
+    monkeypatch.setenv("AGENT_CRITIC_PROVIDER", "ollama")
+    monkeypatch.setenv("AGENT_CRITIC_MODEL", "critic-model")
+    monkeypatch.setenv("ANALYSIS_MIN_QUALITY_SCORE", "0.75")
+    monkeypatch.setenv("ANALYSIS_MIN_GROUNDING_SCORE", "0.8")
+    monkeypatch.setenv("ANALYSIS_ALLOW_DEGRADED_REPORT", "false")
+
+    settings = Settings()
+
+    assert settings.agent_planner_model == "planner-model"
+    assert settings.agent_specialist_model == "specialist-model"
+    assert settings.agent_coordinator_model == "coordinator-model"
+    assert settings.agent_critic_model == "critic-model"
+    assert settings.analysis_min_quality_score == 0.75
+    assert settings.analysis_min_grounding_score == 0.8
+    assert settings.analysis_allow_degraded_report is False

@@ -2,7 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, RotateCcw, Save, Users } from "lucide-react";
+import { Archive, BarChart3, RotateCcw, Save, Users } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -148,6 +149,16 @@ export function ProjectDetailPage({ projectId }: Readonly<{ projectId: string }>
                 )
               ) : null}
             </div>
+
+            <nav aria-label="Project sections" className="flex flex-wrap gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+              <Link
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+                href={`/projects/${projectId}/analyses`}
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                Analyses
+              </Link>
+            </nav>
 
             <form
               className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm"

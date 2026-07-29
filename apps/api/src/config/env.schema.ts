@@ -20,6 +20,10 @@ const BooleanStringSchema = z.preprocess(
   (value) => value ?? "false",
   z.enum(["true", "false"]).transform((value) => value === "true"),
 );
+const TrueBooleanStringSchema = z.preprocess(
+  (value) => value ?? "true",
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+);
 const DurationSchema = z.string().regex(/^\d+[smhd]$/, {
   message: "Expected a duration such as 15m, 1h, or 30d",
 });
@@ -30,6 +34,25 @@ const DEFAULT_REFRESH_PEPPER = "replace-with-local-development-refresh-pepper-32
 export const ApiEnvSchema = z
   .object({
     AI_SERVICE_URL: HttpUrlSchema.default("http://localhost:8000"),
+    ANALYSIS_CHECKPOINT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+    ANALYSIS_GRAPH_VERSION: z.string().min(1).max(100).default("phase-5-v2"),
+    ANALYSIS_JOB_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
+    ANALYSIS_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(660_000),
+    ANALYSIS_MAX_CONCURRENT_PER_PROJECT: z.coerce.number().int().positive().default(2),
+    ANALYSIS_MAX_CONCURRENT_PER_USER: z.coerce.number().int().positive().default(1),
+    ANALYSIS_MAX_DURATION_SECONDS: z.coerce.number().int().positive().default(600),
+    ANALYSIS_MAX_EVIDENCE_PER_SPECIALIST: z.coerce.number().int().positive().max(50).default(8),
+    ANALYSIS_MAX_RETRIEVAL_QUERIES: z.coerce.number().int().positive().max(20).default(5),
+    ANALYSIS_MAX_REVISIONS: z.coerce.number().int().min(0).max(1).default(1),
+    ANALYSIS_MAX_SPECIALISTS: z.coerce.number().int().positive().max(5).default(5),
+    ANALYSIS_MAX_TOTAL_CONTEXT_TOKENS: z.coerce.number().int().positive().default(12_000),
+    ANALYSIS_MAX_TOTAL_OUTPUT_TOKENS: z.coerce.number().int().positive().default(8_000),
+    ANALYSIS_MIN_QUALITY_SCORE: z.coerce.number().min(0).max(1).default(0.7),
+    ANALYSIS_MIN_GROUNDING_SCORE: z.coerce.number().min(0).max(1).default(0.7),
+    ANALYSIS_ALLOW_DEGRADED_REPORT: TrueBooleanStringSchema,
+    ANALYSIS_QUEUE_CONCURRENCY: z.coerce.number().int().positive().default(2),
+    ANALYSIS_QUEUE_NAME: z.string().min(1).default("analysis"),
+    ANALYSIS_RATE_LIMIT: z.coerce.number().int().positive().default(10),
     AUTH_COOKIE_DOMAIN: z.string().optional(),
     AUTH_COOKIE_NAME: z.string().min(1).default("dip_refresh"),
     AUTH_COOKIE_SAME_SITE: SameSiteSchema.default("lax"),

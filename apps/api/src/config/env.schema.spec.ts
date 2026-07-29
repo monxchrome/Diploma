@@ -9,6 +9,10 @@ describe("API environment validation", () => {
     expect(env.PORT).toBe(3001);
     expect(env.NODE_ENV).toBe("development");
     expect(env.AI_SERVICE_URL).toBe("http://localhost:8000");
+    expect(env.ANALYSIS_JOB_TIMEOUT_MS).toBe(660_000);
+    expect(env.ANALYSIS_MIN_QUALITY_SCORE).toBe(0.7);
+    expect(env.ANALYSIS_MIN_GROUNDING_SCORE).toBe(0.7);
+    expect(env.ANALYSIS_ALLOW_DEGRADED_REPORT).toBe(true);
   });
 
   it("rejects malformed URLs", () => {

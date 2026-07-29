@@ -368,3 +368,145 @@ export const AnswerFeedbackRequestSchema = z.object({
   rating: z.number().int().min(1).max(5),
 });
 export type AnswerFeedbackRequest = z.infer<typeof AnswerFeedbackRequestSchema>;
+
+export const AnalysisModeSchema = z.enum(["SINGLE_AGENT", "MULTI_AGENT"]);
+export const SpecialistTypeSchema = z.enum([
+  "MARKET",
+  "FINANCIAL",
+  "LEGAL_REGULATORY",
+  "RISK",
+  "STRATEGY",
+]);
+export const AnalysisStatusSchema = z.enum([
+  "DRAFT",
+  "QUEUED",
+  "RUNNING",
+  "COMPLETED",
+  "COMPLETED_WITH_LIMITATIONS",
+  "FAILED",
+  "CANCELLED",
+  "ARCHIVED",
+]);
+export type AnalysisMode = z.infer<typeof AnalysisModeSchema>;
+export type SpecialistType = z.infer<typeof SpecialistTypeSchema>;
+export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
+
+const BoundedTextListSchema = z.array(z.string().trim().min(1).max(1_000)).max(20).default([]);
+
+export const CreateAnalysisRequestSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  decisionQuestion: z.string().trim().min(1).max(4_000),
+  objectives: BoundedTextListSchema,
+  constraints: BoundedTextListSchema,
+  assumptions: BoundedTextListSchema,
+  timeHorizon: z.string().trim().max(200).optional(),
+  targetMarket: z.string().trim().max(200).optional(),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/)
+    .optional(),
+  knowledgeBaseIds: z.array(z.string().uuid()).min(1).max(50),
+  documentIds: z.array(z.string().uuid()).max(100).default([]),
+  mode: AnalysisModeSchema.default("MULTI_AGENT"),
+  requestedSpecialists: z.array(SpecialistTypeSchema).max(5).default([]),
+  additionalContext: z.string().trim().max(4_000).optional(),
+});
+export type CreateAnalysisRequest = z.infer<typeof CreateAnalysisRequestSchema>;
+
+export const AnalysisPlanSchema = z.object({
+  decisionType: z.string().min(1).max(100),
+  restatedQuestion: z.string().min(1).max(4_000),
+  subQuestions: z.array(z.string().min(1).max(1_000)).max(10),
+  selectedSpecialists: z.array(SpecialistTypeSchema).max(5),
+  specialistTasks: z.record(SpecialistTypeSchema, z.string().min(1).max(2_000)),
+  evidenceNeeds: z.array(z.string().min(1).max(1_000)).max(10),
+  requiredReportSections: z.array(z.string().min(1).max(200)).max(15),
+  knownConstraints: z.array(z.string().min(1).max(1_000)).max(20),
+  expectedDecisionCriteria: z.array(z.string().min(1).max(1_000)).max(10),
+  insufficientEvidenceRisk: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  rationaleSummary: z.string().min(1).max(1_000),
+});
+export type AnalysisPlan = z.infer<typeof AnalysisPlanSchema>;
+
+export const SpecialistResultSchema = z.object({
+  specialist: SpecialistTypeSchema,
+  status: z.enum(["COMPLETED", "DEGRADED", "FAILED", "SKIPPED"]),
+  summary: z.string().max(8_000),
+  findings: z.array(z.string().max(2_000)).max(20),
+  assumptions: z.array(z.string().max(1_000)).max(20),
+  uncertainties: z.array(z.string().max(1_000)).max(20),
+  missingInformation: z.array(z.string().max(1_000)).max(20),
+  citations: z.array(CitationSchema).max(100),
+  riskRegister: z
+    .array(
+      z.object({
+        risk: z.string().max(2_000),
+        category: z.string().max(200),
+        likelihood: z.enum(["LOW", "MEDIUM", "HIGH"]),
+        impact: z.enum(["LOW", "MEDIUM", "HIGH"]),
+        mitigation: z.string().max(2_000),
+        mitigationBasis: z.enum(["EVIDENCE_BACKED", "ANALYTICAL_RECOMMENDATION"]),
+        residualRisk: z.enum(["LOW", "MEDIUM", "HIGH"]),
+        uncertainty: z.string().min(1).max(2_000),
+        citations: z.array(CitationSchema).max(20),
+      }),
+    )
+    .max(30)
+    .default([]),
+  alternatives: z.array(z.string().max(2_000)).max(20).default([]),
+});
+export type SpecialistResult = z.infer<typeof SpecialistResultSchema>;
+
+export const RiskItemSchema = z.object({
+  risk: z.string().max(2_000),
+  category: z.string().max(200),
+  likelihood: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  impact: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  mitigation: z.string().max(2_000),
+  mitigationBasis: z.enum(["EVIDENCE_BACKED", "ANALYTICAL_RECOMMENDATION"]),
+  residualRisk: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  uncertainty: z.string().min(1).max(2_000),
+  citations: z.array(CitationSchema).max(20),
+});
+export type RiskItem = z.infer<typeof RiskItemSchema>;
+
+export const AnalysisReportSchema = z.object({
+  executiveSummary: z.string().max(12_000),
+  recommendedOption: z.string().max(4_000),
+  recommendation: z.string().max(4_000),
+  recommendationRationale: z.string().max(8_000),
+  marketAssessment: z.string().max(8_000),
+  financialAssessment: z.string().max(8_000),
+  legalAssessment: z.string().max(8_000),
+  sections: z
+    .array(z.object({ title: z.string().max(200), content: z.string().max(12_000) }))
+    .max(20),
+  alternatives: z.array(z.string().max(2_000)).max(20),
+  riskRegister: z.array(RiskItemSchema).max(30),
+  implementationRoadmap: z.array(z.string().max(2_000)).max(20),
+  decisionCriteria: z.array(z.string().max(2_000)).max(20),
+  assumptions: z.array(z.string().max(1_000)).max(30),
+  uncertainties: z.array(z.string().max(1_000)).max(30),
+  missingInformation: z.array(z.string().max(1_000)).max(30),
+  confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  citations: z.array(CitationSchema).max(200),
+  insufficientEvidence: z.boolean(),
+  limitations: z.array(z.string().max(2_000)).max(20).default([]),
+  qualityGatePassed: z.boolean(),
+  qualityScore: z.number().min(0).max(1),
+  groundingScore: z.number().min(0).max(1),
+});
+export type AnalysisReport = z.infer<typeof AnalysisReportSchema>;
+
+export const AnalysisSummarySchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  title: z.string(),
+  decisionQuestion: z.string(),
+  mode: AnalysisModeSchema,
+  status: AnalysisStatusSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type AnalysisSummary = z.infer<typeof AnalysisSummarySchema>;

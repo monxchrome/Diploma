@@ -19,6 +19,7 @@ import { SystemModule } from "./modules/system/system.module";
 import { UsersModule } from "./modules/users/users.module";
 import { KnowledgeBasesModule } from "./modules/knowledge-bases/knowledge-bases.module";
 import { RetrievalModule } from "./modules/retrieval/retrieval.module";
+import { AnalysesModule } from "./modules/analyses/analyses.module";
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { RetrievalModule } from "./modules/retrieval/retrieval.module";
     ProjectsModule,
     KnowledgeBasesModule,
     RetrievalModule,
+    AnalysesModule,
     HealthModule,
     SystemModule,
   ],
