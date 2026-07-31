@@ -78,11 +78,15 @@ export default function configuration() {
       url: env.AI_SERVICE_URL,
     },
     app: {
+      baseUrl: env.APP_BASE_URL,
       bodyLimit: env.BODY_LIMIT,
       environment: env.NODE_ENV,
       logLevel: env.LOG_LEVEL,
       port: env.PORT,
       serviceName: env.SERVICE_NAME,
+      trustedProxyCount: env.TRUSTED_PROXY_COUNT,
+      version: env.APP_VERSION,
+      workerOnly: env.APP_WORKER_ONLY,
     },
     auth: {
       accessSecret: env.JWT_ACCESS_SECRET,
@@ -114,6 +118,25 @@ export default function configuration() {
     cors: {
       origins: loadCorsOrigins(env),
     },
+    csrf: {
+      enabled: env.CSRF_ENABLED,
+    },
+    billing: {
+      currency: env.BILLING_CURRENCY,
+      enabled: env.BILLING_ENABLED,
+      fakeProviderEnabled: env.BILLING_FAKE_PROVIDER_ENABLED,
+      fakeWebhookSecret: env.BILLING_FAKE_WEBHOOK_SECRET,
+      planCatalogVersion: env.BILLING_PLAN_CATALOG_VERSION,
+      provider: env.BILLING_PROVIDER,
+      stripe: {
+        cancelUrl: env.STRIPE_CANCEL_URL,
+        portalReturnUrl: env.STRIPE_PORTAL_RETURN_URL,
+        priceIds: { PRO: env.STRIPE_PRO_PRICE_ID, TEAM: env.STRIPE_TEAM_PRICE_ID },
+        secretKey: env.STRIPE_SECRET_KEY,
+        successUrl: env.STRIPE_SUCCESS_URL,
+        webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      },
+    },
     database: {
       url: env.DATABASE_URL,
     },
@@ -134,11 +157,34 @@ export default function configuration() {
       secretKey: env.MINIO_SECRET_KEY,
     },
     rateLimit: {
+      enabled: env.RATE_LIMIT_ENABLED,
+      policyVersion: env.RATE_LIMIT_POLICY_VERSION,
+      authPerMinute: env.RATE_LIMIT_AUTH_PER_MINUTE,
+      apiReadPerMinute: env.RATE_LIMIT_API_READ_PER_MINUTE,
+      apiWritePerMinute: env.RATE_LIMIT_API_WRITE_PER_MINUTE,
+      analysisPerHour: env.RATE_LIMIT_ANALYSIS_PER_HOUR,
+      experimentPerHour: env.RATE_LIMIT_EXPERIMENT_PER_HOUR,
+      exportPerHour: env.RATE_LIMIT_EXPORT_PER_HOUR,
       limit: env.RATE_LIMIT_LIMIT,
+      researchPerHour: env.RATE_LIMIT_RESEARCH_PER_HOUR,
       ttlSeconds: env.RATE_LIMIT_TTL_SECONDS,
+      uploadPerHour: env.RATE_LIMIT_UPLOAD_PER_HOUR,
+      webhookPerMinute: env.RATE_LIMIT_WEBHOOK_PER_MINUTE,
     },
     redis: {
       url: env.REDIS_URL,
+    },
+    services: {
+      qdrantUrl: env.QDRANT_URL,
+    },
+    usage: {
+      aggregationIntervalSeconds: env.USAGE_AGGREGATION_INTERVAL_SECONDS,
+      billingPeriodTimezone: env.USAGE_BILLING_PERIOD_TIMEZONE,
+      enabled: env.USAGE_METERING_ENABLED,
+      reservationTtlSeconds: env.USAGE_RESERVATION_TTL_SECONDS,
+    },
+    webhooks: {
+      bodyLimit: env.WEBHOOK_BODY_LIMIT,
     },
   };
 }

@@ -1,1 +1,8 @@
-{"filters":{},"generateAnswer":true,"topK":10,"projectId":"96e022ee-c114-4a8a-9b1f-2aeaeee66109","mode":"HYBRID","query":"Who is the CEO of the company and what is their phone number?"}
+{
+  "filters": {},
+  "generateAnswer": true,
+  "topK": 10,
+  "projectId": "96e022ee-c114-4a8a-9b1f-2aeaeee66109",
+  "mode": "HYBRID",
+  "query": "Who is the CEO of the company and what is their phone number?"
+}

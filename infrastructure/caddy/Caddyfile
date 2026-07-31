@@ -1,0 +1,41 @@
+{
+  admin off
+  servers {
+    protocols h1 h2
+  }
+}
+
+{$APP_DOMAIN} {
+  encode zstd gzip
+
+  header {
+    -Server
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+    X-Frame-Options "DENY"
+  }
+
+  request_body {
+    max_size {$PROXY_MAX_REQUEST_BODY:110MB}
+  }
+
+  @api path /api/*
+  reverse_proxy @api api:3001 {
+    flush_interval -1
+    transport http {
+      dial_timeout 10s
+      response_header_timeout 120s
+      read_timeout 120s
+      write_timeout 120s
+    }
+  }
+
+  reverse_proxy web:3000 {
+    flush_interval -1
+    transport http {
+      dial_timeout 10s
+      response_header_timeout 60s
+    }
+  }
+}

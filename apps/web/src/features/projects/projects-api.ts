@@ -31,6 +31,32 @@ export const ProjectsPageSchema = PaginatedResponseSchema(ProjectSummarySchema);
 export const ProjectMembersSchema = z.array(ProjectMemberSchema);
 export const AuthSessionsSchema = z.array(AuthSessionSummarySchema);
 export const KnowledgeBasesSchema = z.array(KnowledgeBaseSchema);
+export const BillingPlanSchema = z.object({
+  checkoutAvailable: z.boolean(),
+  code: z.enum(["FREE", "PRO", "TEAM"]),
+  description: z.string(),
+  entitlements: z.record(z.string(), z.union([z.boolean(), z.number()])),
+  name: z.string(),
+  version: z.string(),
+});
+export const BillingSubscriptionSchema = z.object({
+  cancelAtPeriodEnd: z.boolean(),
+  currentPeriodEnd: z.string().datetime().nullable(),
+  currentPeriodStart: z.string().datetime().nullable(),
+  planCode: z.enum(["FREE", "PRO", "TEAM"]),
+  planVersion: z.string(),
+  status: z.string(),
+  trialEndsAt: z.string().datetime().nullable(),
+});
+export const BillingUsageSchema = z.object({
+  billingPeriod: z.string(),
+  limits: z.record(z.string(), z.union([z.boolean(), z.number()])),
+  metrics: z.array(
+    z.object({ metric: z.string(), projectId: z.string().uuid().nullable(), quantity: z.number() }),
+  ),
+  planCode: z.enum(["FREE", "PRO", "TEAM"]),
+  resetAt: z.string().datetime(),
+});
 const jsonTextList = z.array(z.string()).catch([]);
 const jsonIdList = z.array(z.string().uuid()).catch([]);
 
@@ -281,8 +307,17 @@ export function fetchDocuments(apiRequest: ApiRequest, projectId: string, knowle
   );
 }
 
-export function deleteDocument(apiRequest: ApiRequest, projectId: string, knowledgeBaseId: string, documentId: string) {
-  return apiRequest(`/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`, z.unknown(), { method: "DELETE" });
+export function deleteDocument(
+  apiRequest: ApiRequest,
+  projectId: string,
+  knowledgeBaseId: string,
+  documentId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`,
+    z.unknown(),
+    { method: "DELETE" },
+  );
 }
 
 export function createUploadIntent(
@@ -401,4 +436,38 @@ export function fetchApiStatus(apiRequest: ApiRequest) {
   return apiRequest("/api/system/status", SystemStatusResponseSchema, {
     auth: false,
   });
+}
+
+export function fetchBillingPlans(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/plans", z.array(BillingPlanSchema));
+}
+
+export function fetchBillingSubscription(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/subscription", BillingSubscriptionSchema);
+}
+
+export function fetchBillingUsage(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/usage", BillingUsageSchema);
+}
+
+export function startCheckout(apiRequest: ApiRequest, planCode: "PRO" | "TEAM") {
+  return apiRequest(
+    "/api/billing/checkout",
+    z.object({ checkoutUrl: z.string().url(), sessionId: z.string() }),
+    { body: { planCode }, method: "POST" },
+  );
+}
+
+export function openBillingPortal(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/portal", z.object({ portalUrl: z.string().url() }), {
+    method: "POST",
+  });
+}
+
+export function cancelBillingSubscription(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/cancel", BillingSubscriptionSchema, { method: "POST" });
+}
+
+export function resumeBillingSubscription(apiRequest: ApiRequest) {
+  return apiRequest("/api/billing/resume", BillingSubscriptionSchema, { method: "POST" });
 }

@@ -1,7 +1,15 @@
 "use client";
 
 import { cn } from "@dip/ui";
-import { FolderKanban, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import {
+  CreditCard,
+  FolderKanban,
+  Gauge,
+  LayoutDashboard,
+  LogOut,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
@@ -15,6 +23,8 @@ const navItems = [
   { href: "/projects", icon: FolderKanban, label: "Projects" },
   { href: "/settings/profile", icon: UserRound, label: "Profile" },
   { href: "/settings/sessions", icon: ShieldCheck, label: "Sessions" },
+  { href: "/settings/billing", icon: CreditCard, label: "Billing" },
+  { href: "/settings/usage", icon: Gauge, label: "Usage" },
 ];
 
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { DatabaseModule } from "../../infrastructure/database/database.module";
 import { AuditModule } from "../audit/audit.module";
+import { CsrfGuard } from "../../common/guards/csrf.guard";
 import { SessionsModule } from "../sessions/sessions.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
@@ -15,6 +16,13 @@ import { RefreshTokenService } from "./services/refresh-token.service";
   controllers: [AuthController],
   exports: [AccessTokenService, JwtAuthGuard, RefreshTokenService],
   imports: [AuditModule, DatabaseModule, SessionsModule, UsersModule],
-  providers: [AccessTokenService, AuthService, JwtAuthGuard, PasswordService, RefreshTokenService],
+  providers: [
+    AccessTokenService,
+    AuthService,
+    CsrfGuard,
+    JwtAuthGuard,
+    PasswordService,
+    RefreshTokenService,
+  ],
 })
 export class AuthModule {}

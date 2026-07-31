@@ -146,6 +146,11 @@ export class KnowledgeBasesController {
     @Param("knowledgeBaseId", ParseUUIDPipe) knowledgeBaseId: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
   ) {
-    return this.service.archiveDocument({ documentId, knowledgeBaseId, projectId, role: access.role });
+    return this.service.archiveDocument({
+      documentId,
+      knowledgeBaseId,
+      projectId,
+      role: access.role,
+    });
   }
 }

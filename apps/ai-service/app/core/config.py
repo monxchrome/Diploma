@@ -1,4 +1,6 @@
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -174,6 +176,20 @@ class Settings(BaseSettings):
             raise ValueError("RESEARCH_API_KEY is required when the Brave provider is enabled")
         return self
 
+    @model_validator(mode="after")
+    def validate_production_configuration(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        placeholders = {
+            "INGESTION_INTERNAL_SECRET": self.ingestion_internal_secret.get_secret_value(),
+            "MINIO_ACCESS_KEY": self.minio_access_key,
+            "MINIO_SECRET_KEY": self.minio_secret_key.get_secret_value(),
+        }
+        for name, value in placeholders.items():
+            if not value or value.startswith("replace-with-") or value == "dip_minio_password":
+                raise ValueError(f"{name} must be configured in production")
+        return self
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -181,4 +197,23 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    load_docker_secrets()
     return Settings()
+
+
+def load_docker_secrets() -> None:
+    for name in (
+        "INGESTION_INTERNAL_SECRET",
+        "MINIO_ACCESS_KEY",
+        "MINIO_SECRET_KEY",
+        "RESEARCH_API_KEY",
+    ):
+        filename = os.environ.get(f"{name}_FILE")
+        if name in os.environ or not filename:
+            continue
+        try:
+            os.environ[name] = Path(filename).read_text(encoding="utf-8").strip()
+        except OSError as error:
+            raise RuntimeError(
+                f"Unable to read configured Docker secret file for {name}"
+            ) from error

@@ -10,6 +10,7 @@ import { RequestIdMiddleware } from "./common/logging/request-id.middleware";
 import configuration from "./config/configuration";
 import { validateApiEnv } from "./config/env.schema";
 import { QueueModule } from "./infrastructure/queue/queue.module";
+import { RedisModule } from "./infrastructure/redis/redis.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -22,6 +23,7 @@ import { RetrievalModule } from "./modules/retrieval/retrieval.module";
 import { AnalysesModule } from "./modules/analyses/analyses.module";
 import { ResearchModule } from "./modules/research/research.module";
 import { ExperimentsModule } from "./modules/experiments/experiments.module";
+import { BillingModule } from "./modules/billing/billing.module";
 
 @Module({
   imports: [
@@ -82,6 +84,7 @@ import { ExperimentsModule } from "./modules/experiments/experiments.module";
       }),
     }),
     QueueModule,
+    RedisModule,
     AuditModule,
     UsersModule,
     SessionsModule,
@@ -92,6 +95,7 @@ import { ExperimentsModule } from "./modules/experiments/experiments.module";
     AnalysesModule,
     ResearchModule,
     ExperimentsModule,
+    BillingModule,
     HealthModule,
     SystemModule,
   ],

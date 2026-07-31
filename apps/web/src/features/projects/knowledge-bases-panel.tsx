@@ -50,7 +50,8 @@ export function KnowledgeBasesPanel({
   const remove = useMutation({
     mutationFn: (input: { knowledgeBaseId: string; documentId: string }) =>
       deleteDocument(apiRequest, projectId, input.knowledgeBaseId, input.documentId),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-documents", projectId] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-documents", projectId] }),
   });
 
   async function upload(knowledgeBaseId: string, file: File): Promise<void> {
@@ -133,11 +134,23 @@ export function KnowledgeBasesPanel({
             <div key={document.id} className="flex items-center justify-between text-sm">
               <span className="truncate text-slate-700">{document.originalFilename}</span>
               <div className="ml-3 flex items-center gap-2">
-                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{document.status}</span>
+                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                  {document.status}
+                </span>
                 {canEdit && document.status !== "ARCHIVED" ? (
-                  <button className="text-xs font-medium text-red-700" type="button" onClick={() => {
-                    if (confirm(`Delete ${document.originalFilename}?`)) remove.mutate({ documentId: document.id, knowledgeBaseId: document.knowledgeBaseId });
-                  }}>Delete</button>
+                  <button
+                    className="text-xs font-medium text-red-700"
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Delete ${document.originalFilename}?`))
+                        remove.mutate({
+                          documentId: document.id,
+                          knowledgeBaseId: document.knowledgeBaseId,
+                        });
+                    }}
+                  >
+                    Delete
+                  </button>
                 ) : null}
               </div>
             </div>

@@ -54,6 +54,10 @@ export class ProjectsRepository {
     });
   }
 
+  async countActiveOwnedProjects(userId: string): Promise<number> {
+    return this.prisma.project.count({ where: { ownerId: userId, archivedAt: null } });
+  }
+
   async findMembershipWithProject(
     projectId: string,
     userId: string,

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { splitCsv } from "@dip/config";
 import { z } from "zod";
 
@@ -30,9 +32,27 @@ const DurationSchema = z.string().regex(/^\d+[smhd]$/, {
 
 const DEFAULT_JWT_SECRET = "replace-with-local-development-access-secret-32";
 const DEFAULT_REFRESH_PEPPER = "replace-with-local-development-refresh-pepper-32";
+const DEFAULT_INTERNAL_SECRET = "replace-with-local-development-ingestion-secret-32";
+const DEFAULT_FAKE_BILLING_SECRET = "replace-with-local-development-fake-billing-secret-32";
+const SECRET_FILE_KEYS = [
+  "JWT_ACCESS_SECRET",
+  "REFRESH_TOKEN_PEPPER",
+  "INGESTION_INTERNAL_SECRET",
+  "MINIO_ACCESS_KEY",
+  "MINIO_SECRET_KEY",
+  "RESEARCH_API_KEY",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "BILLING_FAKE_WEBHOOK_SECRET",
+] as const;
 
 export const ApiEnvSchema = z
   .object({
+    APP_BASE_URL: HttpUrlSchema.default("http://localhost:3000"),
+    APP_ENV: EnvironmentSchema.optional(),
+    APP_VERSION: z.string().min(1).max(100).default("dev"),
+    APP_WORKER_ONLY: BooleanStringSchema,
+    API_BASE_URL: HttpUrlSchema.default("http://localhost:3001"),
     AI_SERVICE_URL: HttpUrlSchema.default("http://localhost:8000"),
     ANALYSIS_CHECKPOINT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     ANALYSIS_GRAPH_VERSION: z.string().min(1).max(100).default("phase-6-v1"),
@@ -103,15 +123,33 @@ export const ApiEnvSchema = z
     AUTH_REFRESH_RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     AUTH_REGISTER_RATE_LIMIT_LIMIT: z.coerce.number().int().positive().default(5),
     AUTH_REGISTER_RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    BACKUP_DIRECTORY: z.string().min(1).default("/var/backups/dip"),
+    BACKUP_ENABLED: BooleanStringSchema,
+    BACKUP_ENCRYPTION_ENABLED: BooleanStringSchema,
+    BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+    BILLING_CURRENCY: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .default("USD"),
+    BILLING_ENABLED: TrueBooleanStringSchema,
+    BILLING_FAKE_PROVIDER_ENABLED: TrueBooleanStringSchema,
+    BILLING_FAKE_WEBHOOK_SECRET: z.string().min(32).default(DEFAULT_FAKE_BILLING_SECRET),
+    BILLING_PLAN_CATALOG_VERSION: z.string().min(1).max(100).default("phase-7-v1"),
+    BILLING_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
     BODY_LIMIT: z.string().default("1mb"),
     BULLMQ_CONNECTION_URL: z.string().url().default("redis://localhost:6379/1"),
+    CORS_ALLOWED_ORIGINS: z.string().optional(),
     CORS_ORIGINS: z.string().default("http://localhost:3000"),
+    COOKIE_DOMAIN: z.string().optional(),
+    COOKIE_SAME_SITE: SameSiteSchema.optional(),
+    COOKIE_SECURE: BooleanStringSchema.optional(),
+    CSRF_ENABLED: BooleanStringSchema,
+    DEPLOYMENT_COMMIT_SHA: z.string().max(100).default("local"),
+    DEPLOYMENT_ENVIRONMENT: z.string().min(1).max(100).default("local"),
+    DEPLOYMENT_VERSION: z.string().min(1).max(100).default("dev"),
     DOCUMENT_ALLOWED_EXTENSIONS: z.string().default("pdf,docx,txt,md,markdown,html,htm"),
     DOCUMENT_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25_000_000),
-    INGESTION_INTERNAL_SECRET: z
-      .string()
-      .min(32)
-      .default("replace-with-local-development-ingestion-secret-32"),
+    INGESTION_INTERNAL_SECRET: z.string().min(32).default(DEFAULT_INTERNAL_SECRET),
     INGESTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
     DATABASE_URL: z
       .string()
@@ -126,6 +164,17 @@ export const ApiEnvSchema = z
     PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).default(8),
     PORT: z.coerce.number().int().positive().default(3001),
     RATE_LIMIT_LIMIT: z.coerce.number().int().positive().default(120),
+    RATE_LIMIT_ENABLED: TrueBooleanStringSchema,
+    RATE_LIMIT_POLICY_VERSION: z.string().min(1).max(100).default("phase-7-v1"),
+    RATE_LIMIT_AUTH_PER_MINUTE: z.coerce.number().int().positive().default(10),
+    RATE_LIMIT_API_READ_PER_MINUTE: z.coerce.number().int().positive().default(120),
+    RATE_LIMIT_API_WRITE_PER_MINUTE: z.coerce.number().int().positive().default(60),
+    RATE_LIMIT_ANALYSIS_PER_HOUR: z.coerce.number().int().positive().default(10),
+    RATE_LIMIT_EXPERIMENT_PER_HOUR: z.coerce.number().int().positive().default(10),
+    RATE_LIMIT_EXPORT_PER_HOUR: z.coerce.number().int().positive().default(30),
+    RATE_LIMIT_RESEARCH_PER_HOUR: z.coerce.number().int().positive().default(20),
+    RATE_LIMIT_UPLOAD_PER_HOUR: z.coerce.number().int().positive().default(30),
+    RATE_LIMIT_WEBHOOK_PER_MINUTE: z.coerce.number().int().positive().default(120),
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     REDIS_URL: z.string().url().default("redis://localhost:6379/0"),
     MINIO_ACCESS_KEY: z.string().min(3).default("dip_minio"),
@@ -139,9 +188,34 @@ export const ApiEnvSchema = z
     REFRESH_TOKEN_PEPPER: z.string().min(32).default(DEFAULT_REFRESH_PEPPER),
     REFRESH_TOKEN_TTL: DurationSchema.default("30d"),
     SERVICE_NAME: z.string().min(1).default("api"),
+    STRIPE_CANCEL_URL: HttpUrlSchema.optional(),
+    STRIPE_PORTAL_RETURN_URL: HttpUrlSchema.optional(),
+    STRIPE_PRO_PRICE_ID: z.string().min(1).optional(),
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    STRIPE_SUCCESS_URL: HttpUrlSchema.optional(),
+    STRIPE_TEAM_PRICE_ID: z.string().min(1).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).max(10).default(0),
+    USAGE_AGGREGATION_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
+    USAGE_BILLING_PERIOD_TIMEZONE: z.string().min(1).max(100).default("UTC"),
+    USAGE_METERING_ENABLED: TrueBooleanStringSchema,
+    USAGE_RESERVATION_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(900),
+    WEBHOOK_BODY_LIMIT: z.string().default("128kb"),
+    QDRANT_URL: HttpUrlSchema.default("http://localhost:6333"),
   })
   .superRefine((env, context) => {
-    if (env.NODE_ENV === "production" && !env.AUTH_COOKIE_SECURE) {
+    const cookieSecure = env.COOKIE_SECURE ?? env.AUTH_COOKIE_SECURE;
+    const cookieSameSite = env.COOKIE_SAME_SITE ?? env.AUTH_COOKIE_SAME_SITE;
+    const cookieDomain = env.COOKIE_DOMAIN ?? env.AUTH_COOKIE_DOMAIN;
+    const corsOrigins = env.CORS_ALLOWED_ORIGINS ?? env.CORS_ORIGINS;
+    if (env.APP_ENV && env.APP_ENV !== env.NODE_ENV) {
+      context.addIssue({
+        code: "custom",
+        message: "APP_ENV must match NODE_ENV when configured",
+        path: ["APP_ENV"],
+      });
+    }
+    if (env.NODE_ENV === "production" && !cookieSecure) {
       context.addIssue({
         code: "custom",
         message: "AUTH_COOKIE_SECURE must be true in production",
@@ -149,7 +223,7 @@ export const ApiEnvSchema = z
       });
     }
 
-    if (env.AUTH_COOKIE_SAME_SITE === "none" && !env.AUTH_COOKIE_SECURE) {
+    if (cookieSameSite === "none" && !cookieSecure) {
       context.addIssue({
         code: "custom",
         message: "AUTH_COOKIE_SECURE must be true when SameSite=None",
@@ -173,6 +247,73 @@ export const ApiEnvSchema = z
       });
     }
 
+    if (env.NODE_ENV === "production") {
+      const required = [
+        ["APP_BASE_URL", env.APP_BASE_URL],
+        ["API_BASE_URL", env.API_BASE_URL],
+        ["CORS_ALLOWED_ORIGINS", corsOrigins],
+        ["COOKIE_DOMAIN", cookieDomain],
+        ["MINIO_ACCESS_KEY", env.MINIO_ACCESS_KEY],
+        ["MINIO_SECRET_KEY", env.MINIO_SECRET_KEY],
+        ["INGESTION_INTERNAL_SECRET", env.INGESTION_INTERNAL_SECRET],
+        ["QDRANT_URL", env.QDRANT_URL],
+      ] as const;
+      for (const [key, value] of required) {
+        if (!value || value.startsWith("replace-with-") || value === "dip_minio_password") {
+          context.addIssue({
+            code: "custom",
+            message: `${key} must be configured in production`,
+            path: [key],
+          });
+        }
+      }
+      if (!env.APP_BASE_URL.startsWith("https://") || !env.API_BASE_URL.startsWith("https://")) {
+        context.addIssue({
+          code: "custom",
+          message: "APP_BASE_URL and API_BASE_URL must use HTTPS in production",
+          path: ["APP_BASE_URL"],
+        });
+      }
+      if (env.TRUSTED_PROXY_COUNT < 1) {
+        context.addIssue({
+          code: "custom",
+          message: "TRUSTED_PROXY_COUNT must be configured for production",
+          path: ["TRUSTED_PROXY_COUNT"],
+        });
+      }
+      if (
+        env.BILLING_PROVIDER === "fake" &&
+        env.BILLING_FAKE_WEBHOOK_SECRET === DEFAULT_FAKE_BILLING_SECRET
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "BILLING_FAKE_WEBHOOK_SECRET must be replaced in production",
+          path: ["BILLING_FAKE_WEBHOOK_SECRET"],
+        });
+      }
+    }
+
+    if (env.BILLING_PROVIDER === "stripe") {
+      const stripeRequired = [
+        ["STRIPE_SECRET_KEY", env.STRIPE_SECRET_KEY],
+        ["STRIPE_WEBHOOK_SECRET", env.STRIPE_WEBHOOK_SECRET],
+        ["STRIPE_PRO_PRICE_ID", env.STRIPE_PRO_PRICE_ID],
+        ["STRIPE_TEAM_PRICE_ID", env.STRIPE_TEAM_PRICE_ID],
+        ["STRIPE_SUCCESS_URL", env.STRIPE_SUCCESS_URL],
+        ["STRIPE_CANCEL_URL", env.STRIPE_CANCEL_URL],
+        ["STRIPE_PORTAL_RETURN_URL", env.STRIPE_PORTAL_RETURN_URL],
+      ] as const;
+      for (const [key, value] of stripeRequired) {
+        if (!value) {
+          context.addIssue({
+            code: "custom",
+            message: `${key} is required for Stripe`,
+            path: [key],
+          });
+        }
+      }
+    }
+
     if (
       env.EXTERNAL_RESEARCH_ENABLED &&
       env.RESEARCH_PROVIDER === "brave" &&
@@ -189,7 +330,7 @@ export const ApiEnvSchema = z
 export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 
 export function validateApiEnv(config: Record<string, unknown>): ApiEnv {
-  return ApiEnvSchema.parse(config);
+  return ApiEnvSchema.parse(loadDockerSecrets(config));
 }
 
 export function loadApiEnv(): ApiEnv {
@@ -198,4 +339,28 @@ export function loadApiEnv(): ApiEnv {
 
 export function loadCorsOrigins(env: Pick<ApiEnv, "CORS_ORIGINS">): string[] {
   return splitCsv(env.CORS_ORIGINS, ["http://localhost:3000"]);
+}
+
+function loadDockerSecrets(config: Record<string, unknown>): Record<string, unknown> {
+  const resolved = { ...config };
+  for (const key of SECRET_FILE_KEYS) {
+    const filename = config[`${key}_FILE`];
+    if (typeof filename === "string" && filename.trim() && !resolved[key]) {
+      try {
+        resolved[key] = readFileSync(filename.trim(), "utf8").trim();
+      } catch {
+        throw new Error(`Unable to read configured Docker secret file for ${key}`);
+      }
+    }
+  }
+  if (typeof resolved.CORS_ALLOWED_ORIGINS === "string" && resolved.CORS_ALLOWED_ORIGINS.trim()) {
+    resolved.CORS_ORIGINS = resolved.CORS_ALLOWED_ORIGINS;
+  }
+  if (typeof resolved.COOKIE_DOMAIN === "string" && resolved.COOKIE_DOMAIN.trim()) {
+    resolved.AUTH_COOKIE_DOMAIN = resolved.COOKIE_DOMAIN;
+  }
+  if (resolved.COOKIE_SECURE !== undefined) resolved.AUTH_COOKIE_SECURE = resolved.COOKIE_SECURE;
+  if (resolved.COOKIE_SAME_SITE !== undefined)
+    resolved.AUTH_COOKIE_SAME_SITE = resolved.COOKIE_SAME_SITE;
+  return resolved;
 }

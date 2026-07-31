@@ -6,3 +6,4 @@ build
 coverage
 pnpm-lock.yaml
 uv.lock
+.codex-runtime-logs

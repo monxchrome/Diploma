@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -63,3 +64,18 @@ jobs:
 
       - name: Validate Docker Compose
         run: docker compose config
+
+      - name: Validate production Compose and build hardened images
+        run: |
+          cp .env.production.example .env.production
+          docker compose --env-file .env.production -f docker-compose.prod.yml config
+          docker compose --env-file .env.production -f docker-compose.prod.yml build web api ai-service
+
+  production-deployment-gate:
+    if: github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Confirm manual deployment handoff
+        run: echo "Deploy only from an approved protected environment using the documented VM procedure."

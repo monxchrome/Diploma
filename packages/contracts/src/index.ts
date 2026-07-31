@@ -40,11 +40,18 @@ export type SystemStatusResponse = z.infer<typeof SystemStatusResponseSchema>;
 export const ApiErrorSchema = z.object({
   error: z.object({
     code: z.string(),
+    allowedPlanOptions: z.array(z.string()).optional(),
+    currentUsage: z.number().optional(),
     message: z.string(),
+    limit: z.number().optional(),
+    resetAt: z.string().datetime().nullable().optional(),
+    resource: z.string().optional(),
+    retryAfter: z.number().optional(),
     details: z.unknown().optional(),
     path: z.string().optional(),
     requestId: z.string(),
     timestamp: z.string().datetime(),
+    upgradeRequired: z.boolean().optional(),
   }),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

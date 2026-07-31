@@ -29,6 +29,16 @@ export class HealthController {
     return this.baseHealth(status);
   }
 
+  @Get("dependencies")
+  async getDependencies(): Promise<HealthResponse> {
+    return this.baseHealth(await this.healthService.getDependencyStatus());
+  }
+
+  @Get("billing")
+  async getBilling(): Promise<HealthResponse> {
+    return this.baseHealth(await this.healthService.getBillingStatus());
+  }
+
   private baseHealth(status: HealthResponse["status"]): HealthResponse {
     return {
       environment: this.configService.getOrThrow<string>("app.environment"),

@@ -23,6 +23,7 @@ import {
   ProjectMemberRole,
 } from "../../generated/prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { QuotaService } from "../billing/quota.service";
 import { canUpdateProject } from "../projects/project-permissions";
 import { ResearchService } from "../research/research.service";
 
@@ -64,6 +65,7 @@ export class AnalysesService {
     @Inject(ConfigService) private readonly config: ConfigService,
     @InjectQueue("analysis") private readonly queue: Queue,
     @Inject(ResearchService) private readonly research: ResearchService,
+    @Inject(QuotaService) private readonly quota: QuotaService,
   ) {}
 
   async create(input: {
@@ -176,6 +178,34 @@ export class AnalysesService {
     }
     await this.enforceLimits(input.projectId, input.userId);
     const id = randomUUID();
+    await this.quota.reserve({
+      metric: "monthlyAnalysisRuns",
+      projectId: input.projectId,
+      quantity: 1,
+      resourceId: `analysis:${id}`,
+      userId: input.userId,
+    });
+    if (analysis.externalResearchEnabled) {
+      await this.quota.assertFeature({
+        feature: "externalResearchAvailable",
+        projectId: input.projectId,
+        userId: input.userId,
+      });
+      await this.quota.reserve({
+        metric: "monthlyExternalResearchQueries",
+        projectId: input.projectId,
+        quantity: this.config.getOrThrow<number>("research.maximumQueries"),
+        resourceId: `research:${id}:queries`,
+        userId: input.userId,
+      });
+      await this.quota.reserve({
+        metric: "monthlyFetchedExternalPages",
+        projectId: input.projectId,
+        quantity: this.config.getOrThrow<number>("research.maximumFetchedPages"),
+        resourceId: `research:${id}:pages`,
+        userId: input.userId,
+      });
+    }
     const run = await this.prisma.analysisRun.create({
       data: {
         id,
@@ -275,12 +305,12 @@ export class AnalysesService {
         ...objectives,
         ...constraints,
         ...assumptions,
-        typeof run.analysis.additionalContext === "string"
-          ? run.analysis.additionalContext
-          : "",
+        typeof run.analysis.additionalContext === "string" ? run.analysis.additionalContext : "",
       ];
       const retrievalQuery = retrievalParts
-        .filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+        .filter(
+          (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
+        )
         .join(" ")
         .slice(0, 4_000);
       if (run.analysis.evidenceMode !== "EXTERNAL_ONLY") {
@@ -497,7 +527,31 @@ export class AnalysesService {
             update: { graphVersion: run.graphVersion, state: { stage: nodeName } },
           });
       });
+      await this.quota.finalizeReservation({
+        event: {
+          eventType: "monthlyAnalysisRuns",
+          idempotencyKey: `usage:analysis:${run.id}`,
+          metric: "monthlyAnalysisRuns",
+          projectId: run.projectId,
+          quantity: 1,
+          resourceId: run.id,
+          resourceType: "AnalysisRun",
+          unit: "run",
+          userId: run.userId,
+        },
+        resourceId: `analysis:${run.id}`,
+      });
+      if (researchRun) {
+        await this.finalizeResearchUsage({
+          analysisRunId: run.id,
+          projectId: run.projectId,
+          userId: run.userId,
+        });
+      }
     } catch (error) {
+      await this.quota.releaseResourceReservation(`analysis:${run.id}`);
+      await this.quota.releaseResourceReservation(`research:${run.id}:queries`);
+      await this.quota.releaseResourceReservation(`research:${run.id}:pages`);
       const failure = this.classifyExecutionFailure(error);
       await this.prisma.analysisRun.update({
         where: { id: run.id },
@@ -511,6 +565,46 @@ export class AnalysesService {
       });
       throw new Error(failure.message, { cause: error });
     }
+  }
+
+  private async finalizeResearchUsage(input: {
+    analysisRunId: string;
+    projectId: string;
+    userId: string;
+  }): Promise<void> {
+    const researchRun = await this.prisma.researchRun.findUnique({
+      where: { analysisRunId: input.analysisRunId },
+      select: { fetchedPageCount: true, queryCount: true, totalFetchedBytes: true },
+    });
+    if (!researchRun) return;
+    await this.quota.finalizeReservation({
+      event: {
+        eventType: "monthlyExternalResearchQueries",
+        idempotencyKey: `usage:research:queries:${input.analysisRunId}`,
+        metric: "monthlyExternalResearchQueries",
+        projectId: input.projectId,
+        quantity: researchRun.queryCount,
+        resourceId: input.analysisRunId,
+        resourceType: "ResearchRun",
+        unit: "query",
+        userId: input.userId,
+      },
+      resourceId: `research:${input.analysisRunId}:queries`,
+    });
+    await this.quota.finalizeReservation({
+      event: {
+        eventType: "monthlyFetchedExternalPages",
+        idempotencyKey: `usage:research:pages:${input.analysisRunId}`,
+        metric: "monthlyFetchedExternalPages",
+        projectId: input.projectId,
+        quantity: researchRun.fetchedPageCount,
+        resourceId: input.analysisRunId,
+        resourceType: "ResearchRun",
+        unit: "page",
+        userId: input.userId,
+      },
+      resourceId: `research:${input.analysisRunId}:pages`,
+    });
   }
 
   private async requireScope(projectId: string, body: CreateAnalysisRequest): Promise<void> {

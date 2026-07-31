@@ -13,7 +13,20 @@ import { ErrorCodes } from "../errors/error-codes";
 import { getRequestId } from "../logging/request-id";
 
 type ErrorResponseBody =
-  string | { error?: string; message?: string | string[]; statusCode?: number };
+  | string
+  | {
+      allowedPlanOptions?: string[];
+      code?: string;
+      currentUsage?: number;
+      error?: string;
+      limit?: number;
+      message?: string | string[];
+      resetAt?: string | null;
+      resource?: string;
+      retryAfter?: number;
+      statusCode?: number;
+      upgradeRequired?: boolean;
+    };
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -57,13 +70,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
             ? response.message.join("; ")
             : (response.message ?? response.error ?? exception.message);
 
+      const details = typeof response === "string" ? {} : quotaDetails(response);
       return {
         error: {
-          code: status === 400 ? ErrorCodes.ValidationError : exception.name,
+          code:
+            typeof response === "string"
+              ? status === 400
+                ? ErrorCodes.ValidationError
+                : exception.name
+              : (response.code ?? (status === 400 ? ErrorCodes.ValidationError : exception.name)),
           message,
           path: request.path,
           requestId,
           timestamp,
+          ...details,
         },
       };
     }
@@ -78,4 +98,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
       },
     };
   }
+}
+
+function quotaDetails(response: Exclude<ErrorResponseBody, string>) {
+  const {
+    allowedPlanOptions,
+    currentUsage,
+    limit,
+    resetAt,
+    resource,
+    retryAfter,
+    upgradeRequired,
+  } = response;
+  return {
+    ...(allowedPlanOptions ? { allowedPlanOptions } : {}),
+    ...(currentUsage === undefined ? {} : { currentUsage }),
+    ...(limit === undefined ? {} : { limit }),
+    ...(resetAt === undefined ? {} : { resetAt }),
+    ...(resource === undefined ? {} : { resource }),
+    ...(retryAfter === undefined ? {} : { retryAfter }),
+    ...(upgradeRequired === undefined ? {} : { upgradeRequired }),
+  };
 }

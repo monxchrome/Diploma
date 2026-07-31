@@ -10,6 +10,7 @@ import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { MinioService } from "../../infrastructure/storage/minio.service";
 import { AiServiceClient } from "../../infrastructure/http/ai-service.client";
 import { AuditService } from "../audit/audit.service";
+import { QuotaService } from "../billing/quota.service";
 import { canArchiveProject, canUpdateProject } from "../projects/project-permissions";
 import {
   DocumentStatus,
@@ -38,6 +39,7 @@ export class KnowledgeBasesService {
     @Inject(AiServiceClient) private readonly ai: AiServiceClient,
     @Inject(ConfigService) private readonly config: ConfigService,
     @InjectQueue("ingestion") private readonly queue: Queue,
+    @Inject(QuotaService) private readonly quota: QuotaService,
   ) {}
 
   async list(projectId: string, status: "active" | "archived" | "all" = "active") {
@@ -71,6 +73,14 @@ export class KnowledgeBasesService {
     name: string;
     description?: string;
   }) {
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: await this.prisma.knowledgeBase.count({
+        where: { projectId: input.projectId, archivedAt: null },
+      }),
+      entitlement: "maximumKnowledgeBasesPerProject",
+      projectId: input.projectId,
+      userId: input.userId,
+    });
     const knowledgeBase = await this.prisma.knowledgeBase.create({
       data: {
         projectId: input.projectId,
@@ -158,8 +168,28 @@ export class KnowledgeBasesService {
     this.requireEditor(input.role);
     await this.requireKnowledgeBase(input.projectId, input.knowledgeBaseId);
     const validation = this.validateUpload(input.filename, input.declaredMimeType, input.sizeBytes);
+    await this.quota.assertUploadSize({
+      projectId: input.projectId,
+      sizeBytes: input.sizeBytes,
+      userId: input.userId,
+    });
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: await this.prisma.document.count({
+        where: { knowledgeBaseId: input.knowledgeBaseId, archivedAt: null },
+      }),
+      entitlement: "maximumDocumentsPerKnowledgeBase",
+      projectId: input.projectId,
+      userId: input.userId,
+    });
     const documentId = randomUUID();
     const versionId = randomUUID();
+    await this.quota.reserve({
+      metric: "maximumStorageBytes",
+      projectId: input.projectId,
+      quantity: input.sizeBytes,
+      resourceId: `document:${documentId}`,
+      userId: input.userId,
+    });
     const storageKey = `projects/${input.projectId}/knowledge-bases/${input.knowledgeBaseId}/documents/${documentId}/versions/1/${randomUUID()}-${validation.safeFilename}`;
     const result = await this.prisma.$transaction(async (tx) => {
       const document = await tx.document.create({
@@ -269,6 +299,20 @@ export class KnowledgeBasesService {
       where: { id: job.id },
       data: { bullJobId: job.id },
     });
+    await this.quota.finalizeReservation({
+      event: {
+        eventType: "maximumStorageBytes",
+        idempotencyKey: `usage:storage:${document.id}`,
+        metric: "maximumStorageBytes",
+        projectId: input.projectId,
+        quantity: Number(document.sizeBytes),
+        resourceId: document.id,
+        resourceType: "Document",
+        unit: "bytes",
+        userId: input.userId,
+      },
+      resourceId: `document:${document.id}`,
+    });
     await this.audit.record({
       action: "document.upload_completed",
       actorUserId: input.userId,
@@ -298,13 +342,20 @@ export class KnowledgeBasesService {
   }) {
     this.requireEditor(input.role);
     const document = await this.prisma.document.findFirst({
-      where: { id: input.documentId, knowledgeBaseId: input.knowledgeBaseId, knowledgeBase: { projectId: input.projectId } },
+      where: {
+        id: input.documentId,
+        knowledgeBaseId: input.knowledgeBaseId,
+        knowledgeBase: { projectId: input.projectId },
+      },
     });
-    if (!document) throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Document not found" });
-    return documentDto(await this.prisma.document.update({
-      where: { id: document.id },
-      data: { archivedAt: new Date(), status: DocumentStatus.ARCHIVED },
-    }));
+    if (!document)
+      throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Document not found" });
+    return documentDto(
+      await this.prisma.document.update({
+        where: { id: document.id },
+        data: { archivedAt: new Date(), status: DocumentStatus.ARCHIVED },
+      }),
+    );
   }
   private async requireKnowledgeBase(projectId: string, id: string) {
     const value = await this.prisma.knowledgeBase.findFirst({ where: { id, projectId } });

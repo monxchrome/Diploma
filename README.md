@@ -310,3 +310,35 @@ With PostgreSQL, Redis, web, and API running, register or sign in through `http:
 - Hybrid indexing uses `dip_document_chunks_v2` with named `dense` and `sparse` vectors. The v1 collection is not deleted. Reindex is idempotent and accepts `--project`, `--knowledge-base`, `--document`, `--batch-size`, `--resume`, `--force`, `--verify`, and `--dry-run`.
 - Sparse retrieval is a CPU-only local deterministic baseline. `RAG_GENERATION_ENABLED=false` keeps Ask extractive and grounded; enabling an Ollama model is an operational choice and does not enable tools or web access.
 - TXT, Markdown, HTML, DOCX, and PDF uploads are accepted. PDF completion currently requires a production Docling adapter. The development file scanner is structural validation, not malware scanning; production must configure a fail-closed scanner.
+
+## Phase 7 production deployment and billing
+
+Production uses [docker-compose.prod.yml](docker-compose.prod.yml) on a single Linux VM. Caddy is the only service exposing host ports (80/443), handles automatic TLS and HTTP-to-HTTPS redirects, and proxies only the web application and `/api/*`. PostgreSQL, Redis, Qdrant, MinIO, FastAPI, Ollama, and workers remain on private Docker networking.
+
+Copy `.env.production.example` to an ignored `.env.production`, create the external Docker secrets declared by the production Compose file, and deploy with:
+
+```bash
+scripts/production/deploy.sh .env.production
+```
+
+Migrations are a separate controlled step (`scripts/production/migrate.sh`). The release process runs readiness checks after deployment. Application images can be rolled back only when they remain schema-compatible; database migrations are forward-only. See `docs/deployment/production.md` and `docs/deployment/rollback.md`.
+
+Production configuration validates URL origins, trusted proxy configuration, secure cookie settings, database/Redis/MinIO/Qdrant/internal-service configuration, and provider settings before the app accepts traffic. API secrets may come from environment variables or `*_FILE` Docker secret paths and are never returned or logged.
+
+Billing offers server-owned FREE, PRO, and TEAM catalog entries. The local fake provider is deterministic and needs no Stripe key. Stripe uses trusted configured price IDs, signed webhooks, idempotent event storage, and webhook-driven subscription state; a checkout redirect never grants access. Billing routes are:
+
+```text
+GET  /api/billing/plans
+GET  /api/billing/subscription
+GET  /api/billing/entitlements
+GET  /api/billing/usage
+POST /api/billing/checkout
+POST /api/billing/portal
+POST /api/billing/cancel
+POST /api/billing/resume
+POST /api/webhooks/stripe
+```
+
+Usage uses an immutable, idempotent ledger with reservations for expensive work. Quota rejection returns `QUOTA_EXCEEDED` with the constrained resource, current usage, limit, reset time, and available upgrade options. Users can view safe subscription and usage details at `/settings/billing` and `/settings/usage`.
+
+Run `scripts/production/backup.sh .env.production` for timestamped PostgreSQL, MinIO, and Qdrant backup artifacts. Restore is deliberately manual and requires `CONFIRM_RESTORE=yes`; see `docs/deployment/backups-and-restore.md`. The reference deployment is single-region, has no Kubernetes or multi-region failover, cannot automatically roll back a database migration, supports Stripe as the only production payment adapter, and treats estimated AI costs as telemetry rather than invoice truth.

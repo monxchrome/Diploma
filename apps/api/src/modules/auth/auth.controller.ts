@@ -30,6 +30,7 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RefreshTokenService } from "./services/refresh-token.service";
+import { CsrfGuard } from "../../common/guards/csrf.guard";
 
 @Controller("auth")
 @SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
@@ -66,6 +67,7 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(200)
+  @UseGuards(CsrfGuard)
   @SkipThrottle({ authLogin: true, authRefresh: false, authRegister: true })
   @Throttle({ authRefresh: {} })
   async refresh(
@@ -77,6 +79,7 @@ export class AuthController {
 
   @Post("logout")
   @HttpCode(204)
+  @UseGuards(CsrfGuard)
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

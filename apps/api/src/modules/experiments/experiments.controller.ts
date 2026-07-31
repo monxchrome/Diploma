@@ -186,18 +186,20 @@ export class ExperimentsController {
 
   @Get(":experimentId/export.json")
   exportJson(
+    @CurrentUser() user: AuthenticatedUser,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("experimentId", ParseUUIDPipe) experimentId: string,
   ) {
-    return this.experiments.exportJson(projectId, experimentId);
+    return this.experiments.exportJson(projectId, experimentId, user.id);
   }
 
   @Get(":experimentId/export.csv")
   @Header("Content-Type", "text/csv; charset=utf-8")
   exportCsv(
+    @CurrentUser() user: AuthenticatedUser,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("experimentId", ParseUUIDPipe) experimentId: string,
   ) {
-    return this.experiments.exportCsv(projectId, experimentId);
+    return this.experiments.exportCsv(projectId, experimentId, user.id);
   }
 }

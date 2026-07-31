@@ -150,6 +150,43 @@ enum SpecialistType {
   STRATEGY
 }
 
+enum PlanCode {
+  FREE
+  PRO
+  TEAM
+}
+
+enum BillingProviderName {
+  FAKE
+  STRIPE
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  PAUSED
+  CANCELLED
+  INCOMPLETE
+  EXPIRED
+}
+
+enum BillingWebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  REJECTED
+  FAILED
+}
+
+enum UsageReservationStatus {
+  ACTIVE
+  FINALIZED
+  RELEASED
+  EXPIRED
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -158,6 +195,145 @@ model SystemCheck {
   createdAt DateTime @default(now())
 
   @@index([service, createdAt])
+}
+
+model PlanDefinition {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         PlanCode
+  version      String
+  name         String
+  description  String
+  entitlements Json
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([code, version])
+  @@index([active, code])
+}
+
+model BillingCustomer {
+  id                 String              @id @default(uuid()) @db.Uuid
+  userId             String              @unique @db.Uuid
+  provider           BillingProviderName
+  providerCustomerId String              @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([provider, providerCustomerId])
+}
+
+model Subscription {
+  id                     String              @id @default(uuid()) @db.Uuid
+  userId                 String              @unique @db.Uuid
+  billingCustomerId      String?             @unique @db.Uuid
+  planCode               PlanCode             @default(FREE)
+  planVersion            String
+  provider               BillingProviderName  @default(FAKE)
+  providerSubscriptionId String?             @unique
+  providerPriceId        String?
+  status                 SubscriptionStatus  @default(NONE)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean             @default(false)
+  trialEndsAt            DateTime?
+  cancelledAt            DateTime?
+  metadata               Json                @default("{}")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  @@index([provider, providerSubscriptionId])
+  @@index([status, currentPeriodEnd])
+}
+
+model BillingWebhookEvent {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  provider           BillingProviderName
+  providerEventId    String
+  eventType          String
+  status             BillingWebhookEventStatus  @default(RECEIVED)
+  payloadHash        String
+  processingAttempts Int                        @default(0)
+  processedAt        DateTime?
+  failureCode        String?
+  failureMessage     String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@unique([provider, providerEventId])
+  @@index([status, createdAt])
+}
+
+model UsageEvent {
+  id                       String   @id @default(uuid()) @db.Uuid
+  userId                   String   @db.Uuid
+  projectId                String?  @db.Uuid
+  subscriptionId           String?  @db.Uuid
+  eventType                String
+  resourceType             String
+  resourceId               String
+  quantity                 Decimal  @db.Decimal(18, 6)
+  unit                     String
+  estimatedCostMinorUnits  BigInt?
+  currency                 String?
+  billingPeriod            String
+  idempotencyKey           String   @unique
+  metadata                 Json     @default("{}")
+  occurredAt               DateTime
+  createdAt                DateTime @default(now())
+
+  @@index([userId, billingPeriod, eventType])
+  @@index([projectId, billingPeriod, eventType])
+  @@index([resourceType, resourceId])
+}
+
+model UsageAggregate {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  projectId     String?  @db.Uuid
+  scopeKey      String
+  billingPeriod String
+  metric        String
+  quantity      Decimal  @db.Decimal(18, 6)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, scopeKey, billingPeriod, metric])
+  @@index([userId, projectId, billingPeriod])
+}
+
+model UsageReservation {
+  id                String                 @id @default(uuid()) @db.Uuid
+  userId            String                 @db.Uuid
+  projectId         String?                @db.Uuid
+  metric            String
+  reservedQuantity  Decimal                @db.Decimal(18, 6)
+  status            UsageReservationStatus @default(ACTIVE)
+  resourceId        String
+  idempotencyKey    String                 @unique
+  expiresAt         DateTime
+  finalizedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([userId, projectId, metric, status, expiresAt])
+  @@index([resourceId])
+}
+
+model EntitlementOverride {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @db.Uuid
+  projectId    String?  @db.Uuid
+  entitlement  String
+  value        Json
+  reason       String
+  createdById  String   @db.Uuid
+  startsAt     DateTime
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, entitlement, startsAt, expiresAt])
+  @@index([projectId, entitlement, startsAt, expiresAt])
 }
 
 model User {

@@ -390,7 +390,8 @@ export class ResearchService {
           (source) => source.pipelineStatus === "SECURITY_REJECTED",
         ).length,
         policyRejectedCount: response.sources.filter(
-          (source) => source.rejectionReason && source.rejectionReason !== "PROMPT_INJECTION_DETECTED",
+          (source) =>
+            source.rejectionReason && source.rejectionReason !== "PROMPT_INJECTION_DETECTED",
         ).length,
         totalFetchedBytes: response.totalFetchedBytes,
         totalExtractedCharacters: response.totalExtractedCharacters,

@@ -1,5 +1,11 @@
 import type { PaginatedResponse, Project, ProjectMember, ProjectSummary } from "@dip/contracts";
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 
 import { ErrorCodes } from "../../common/errors/error-codes";
 import type { ProjectMemberRole } from "../../generated/prisma/client";
@@ -15,12 +21,14 @@ import {
 } from "./project.mapper";
 import { canArchiveProject, canUpdateProject, canViewProject } from "./project-permissions";
 import { ProjectsRepository } from "./repositories/projects.repository";
+import { QuotaService } from "../billing/quota.service";
 
 @Injectable()
 export class ProjectsService {
   constructor(
     @Inject(AuditService) private readonly auditService: AuditService,
     @Inject(ProjectsRepository) private readonly projectsRepository: ProjectsRepository,
+    @Optional() @Inject(QuotaService) private readonly quota?: QuotaService,
   ) {}
 
   async createProject(data: {
@@ -28,6 +36,13 @@ export class ProjectsService {
     requestId: string;
     userId: string;
   }): Promise<Project> {
+    if (this.quota) {
+      await this.quota.assertCurrentResourceLimit({
+        currentUsage: await this.projectsRepository.countActiveOwnedProjects(data.userId),
+        entitlement: "maximumProjects",
+        userId: data.userId,
+      });
+    }
     const membership = await this.projectsRepository.createOwnedProject({
       description: normalizeOptionalText(data.body.description),
       name: data.body.name.trim(),

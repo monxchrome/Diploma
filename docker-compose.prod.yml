@@ -1,0 +1,352 @@
+name: dip-production
+
+x-service-hardening: &service-hardening
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+services:
+  caddy:
+    <<: *service-hardening
+    image: caddy:2.10-alpine
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [dip-public]
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+
+  web:
+    <<: *service-hardening
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: production
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${API_BASE_URL:-https://localhost}
+      NEXT_PUBLIC_ENVIRONMENT: production
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [dip-public]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: { cpus: "1.00", memory: 512M }
+
+  api:
+    <<: *service-hardening
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    depends_on:
+      ai-service: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL}
+      APP_ENV: production
+      APP_VERSION: ${DEPLOYMENT_VERSION:-unknown}
+      API_BASE_URL: ${API_BASE_URL}
+      APP_WORKER_ONLY: "false"
+      AUTH_COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      AUTH_COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+      AUTH_COOKIE_SECURE: "true"
+      BILLING_ENABLED: ${BILLING_ENABLED:-true}
+      BILLING_FAKE_WEBHOOK_SECRET_FILE: /run/secrets/billing_fake_webhook_secret
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-fake}
+      BILLING_PLAN_CATALOG_VERSION: ${BILLING_PLAN_CATALOG_VERSION:-phase-7-v1}
+      BULLMQ_CONNECTION_URL: redis://redis:6379/1
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      CSRF_ENABLED: ${CSRF_ENABLED:-true}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DEPLOYMENT_COMMIT_SHA: ${DEPLOYMENT_COMMIT_SHA:-unknown}
+      DEPLOYMENT_ENVIRONMENT: production
+      DEPLOYMENT_VERSION: ${DEPLOYMENT_VERSION:-unknown}
+      DOCUMENT_MAX_UPLOAD_BYTES: ${DOCUMENT_MAX_UPLOAD_BYTES:-25000000}
+      EXTERNAL_RESEARCH_ENABLED: ${EXTERNAL_RESEARCH_ENABLED:-false}
+      INGESTION_INTERNAL_SECRET_FILE: /run/secrets/ingestion_internal_secret
+      JWT_ACCESS_SECRET_FILE: /run/secrets/jwt_access_secret
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_access_key
+      MINIO_BUCKET: ${MINIO_BUCKET:-dip-documents}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_secret_key
+      NODE_ENV: production
+      PORT: 3001
+      QDRANT_URL: http://qdrant:6333
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_POLICY_VERSION: ${RATE_LIMIT_POLICY_VERSION:-phase-7-v1}
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_PEPPER_FILE: /run/secrets/refresh_token_pepper
+      RESEARCH_API_KEY_FILE: /run/secrets/research_api_key
+      RESEARCH_PROVIDER: ${RESEARCH_PROVIDER:-fake}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+      STRIPE_PORTAL_RETURN_URL: ${STRIPE_PORTAL_RETURN_URL:-}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
+      STRIPE_TEAM_PRICE_ID: ${STRIPE_TEAM_PRICE_ID:-}
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      TRUSTED_PROXY_COUNT: "1"
+    secrets:
+      - ingestion_internal_secret
+      - billing_fake_webhook_secret
+      - jwt_access_secret
+      - minio_access_key
+      - minio_secret_key
+      - refresh_token_pepper
+      - research_api_key
+      - stripe_secret_key
+      - stripe_webhook_secret
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+    networks: [dip-public, dip-internal]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: { cpus: "2.00", memory: 1G }
+
+  worker:
+    <<: *service-hardening
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    depends_on:
+      ai-service: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL}
+      APP_ENV: production
+      APP_VERSION: ${DEPLOYMENT_VERSION:-unknown}
+      API_BASE_URL: ${API_BASE_URL}
+      APP_WORKER_ONLY: "true"
+      AUTH_COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      AUTH_COOKIE_SECURE: "true"
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-fake}
+      BILLING_FAKE_WEBHOOK_SECRET_FILE: /run/secrets/billing_fake_webhook_secret
+      BULLMQ_CONNECTION_URL: redis://redis:6379/1
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      INGESTION_INTERNAL_SECRET_FILE: /run/secrets/ingestion_internal_secret
+      JWT_ACCESS_SECRET_FILE: /run/secrets/jwt_access_secret
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_access_key
+      MINIO_BUCKET: ${MINIO_BUCKET:-dip-documents}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_secret_key
+      NODE_ENV: production
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_PEPPER_FILE: /run/secrets/refresh_token_pepper
+      RESEARCH_API_KEY_FILE: /run/secrets/research_api_key
+      RESEARCH_PROVIDER: ${RESEARCH_PROVIDER:-fake}
+      STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      TRUSTED_PROXY_COUNT: "1"
+    secrets:
+      - ingestion_internal_secret
+      - billing_fake_webhook_secret
+      - jwt_access_secret
+      - minio_access_key
+      - minio_secret_key
+      - refresh_token_pepper
+      - research_api_key
+      - stripe_secret_key
+      - stripe_webhook_secret
+    networks: [dip-internal]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: { cpus: "2.00", memory: 1G }
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    profiles: ["operations"]
+    command: ["pnpm", "--filter", "@dip/api", "exec", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [dip-internal]
+    restart: "no"
+
+  ai-service:
+    <<: *service-hardening
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+      target: production
+    environment:
+      CORS_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      INGESTION_INTERNAL_SECRET_FILE: /run/secrets/ingestion_internal_secret
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_access_key
+      MINIO_BUCKET: ${MINIO_BUCKET:-dip-documents}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_secret_key
+      NODE_ENV: production
+      OLLAMA_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+      RESEARCH_API_KEY_FILE: /run/secrets/research_api_key
+      RESEARCH_PROVIDER: ${RESEARCH_PROVIDER:-fake}
+    secrets: [ingestion_internal_secret, minio_access_key, minio_secret_key, research_api_key]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [dip-internal]
+    read_only: true
+    tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits: { cpus: "2.00", memory: 2G }
+
+  postgres:
+    <<: *service-hardening
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [dip-internal]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    deploy:
+      resources:
+        limits: { cpus: "2.00", memory: 2G }
+
+  redis:
+    <<: *service-hardening
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [dip-internal]
+    volumes: [redis-data:/data]
+    deploy:
+      resources:
+        limits: { cpus: "1.00", memory: 512M }
+
+  qdrant:
+    <<: *service-hardening
+    image: qdrant/qdrant:v1.15.3
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:6333/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [dip-internal]
+    volumes: [qdrant-data:/qdrant/storage]
+
+  minio:
+    <<: *service-hardening
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [dip-internal]
+    volumes: [minio-data:/data]
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-ec"]
+    command: >-
+      mc alias set dip http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+      mc mb --ignore-existing "dip/$${MINIO_BUCKET}";
+      mc anonymous set none "dip/$${MINIO_BUCKET}";
+    environment:
+      MINIO_BUCKET: ${MINIO_BUCKET:-dip-documents}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    networks: [dip-internal]
+    restart: "no"
+
+  ollama:
+    <<: *service-hardening
+    image: ollama/ollama:0.9.0
+    profiles: ["model-runtime"]
+    networks: [dip-internal]
+    volumes: [ollama-data:/root/.ollama]
+
+networks:
+  dip-public: { driver: bridge }
+  dip-internal: { driver: bridge, internal: true }
+
+secrets:
+  billing_fake_webhook_secret: { external: true }
+  ingestion_internal_secret: { external: true }
+  jwt_access_secret: { external: true }
+  minio_access_key: { external: true }
+  minio_secret_key: { external: true }
+  refresh_token_pepper: { external: true }
+  research_api_key: { external: true }
+  stripe_secret_key: { external: true }
+  stripe_webhook_secret: { external: true }
+
+volumes:
+  caddy-config:
+  caddy-data:
+  minio-data:
+  ollama-data:
+  postgres-data:
+  qdrant-data:
+  redis-data:

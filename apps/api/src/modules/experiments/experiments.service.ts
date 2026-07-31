@@ -20,6 +20,7 @@ import {
 } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { QuotaService } from "../billing/quota.service";
 import { canUpdateProject } from "../projects/project-permissions";
 
 type VariantInput = z.infer<typeof ExperimentVariantRequestSchema>;
@@ -33,6 +34,7 @@ export class ExperimentsService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(ConfigService) private readonly config: ConfigService,
     @InjectQueue("experiments") private readonly queue: Queue,
+    @Inject(QuotaService) private readonly quota: QuotaService,
   ) {}
 
   async create(input: {
@@ -43,6 +45,11 @@ export class ExperimentsService {
     userId: string;
   }) {
     this.requireEditor(input.role);
+    await this.quota.assertFeature({
+      feature: "experimentAvailable",
+      projectId: input.projectId,
+      userId: input.userId,
+    });
     const experiment = await this.prisma.experiment.create({
       data: {
         projectId: input.projectId,
@@ -119,6 +126,13 @@ export class ExperimentsService {
     await this.requireExperiment(input.projectId, input.experimentId);
     const count = await this.prisma.experimentVariant.count({
       where: { experimentId: input.experimentId },
+    });
+    const experiment = await this.requireExperiment(input.projectId, input.experimentId);
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: count,
+      entitlement: "maximumExperimentVariants",
+      projectId: input.projectId,
+      userId: experiment.createdById,
     });
     if (count >= this.config.getOrThrow<number>("experiments.maximumVariants")) {
       throw this.limit("Experiment variant limit reached");
@@ -197,6 +211,13 @@ export class ExperimentsService {
     if (estimatedCost > this.config.getOrThrow<number>("experiments.maximumEstimatedCost")) {
       throw this.limit("Experiment estimated cost limit reached");
     }
+    await this.quota.reserve({
+      metric: "monthlyExperimentRuns",
+      projectId: input.projectId,
+      quantity: runCount,
+      resourceId: `experiment:${experiment.id}`,
+      userId: input.userId,
+    });
     await this.prisma.$transaction(async (tx) => {
       for (const variant of experiment.variants) {
         for (const testCase of experiment.cases) {
@@ -251,6 +272,7 @@ export class ExperimentsService {
       where: { id: experimentId },
       data: { cancellationRequested: true },
     });
+    await this.quota.releaseResourceReservation(`experiment:${experimentId}`);
     return { id: experimentId, cancellationRequested: true };
   }
 
@@ -305,6 +327,20 @@ export class ExperimentsService {
     await this.prisma.experiment.update({
       where: { id: experimentId },
       data: { status: ExperimentStatus.COMPLETED_WITH_LIMITATIONS, completedAt: new Date() },
+    });
+    await this.quota.finalizeReservation({
+      event: {
+        eventType: "monthlyExperimentRuns",
+        idempotencyKey: `usage:experiment:${experiment.id}`,
+        metric: "monthlyExperimentRuns",
+        projectId: experiment.projectId,
+        quantity: experiment.runs.length,
+        resourceId: experiment.id,
+        resourceType: "Experiment",
+        unit: "run",
+        userId: experiment.createdById,
+      },
+      resourceId: `experiment:${experiment.id}`,
     });
   }
 
@@ -367,11 +403,13 @@ export class ExperimentsService {
     });
   }
 
-  async exportJson(projectId: string, experimentId: string) {
+  async exportJson(projectId: string, experimentId: string, userId: string) {
+    await this.quota.assertFeature({ feature: "jsonCsvExportAvailable", projectId, userId });
     return this.get(projectId, experimentId);
   }
 
-  async exportCsv(projectId: string, experimentId: string): Promise<string> {
+  async exportCsv(projectId: string, experimentId: string, userId: string): Promise<string> {
+    await this.quota.assertFeature({ feature: "jsonCsvExportAvailable", projectId, userId });
     const runs = await this.listRuns(projectId, experimentId);
     const rows = ["run_id,case,variant,status,metric,value"];
     for (const run of runs) {

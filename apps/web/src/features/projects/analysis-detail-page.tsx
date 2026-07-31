@@ -376,8 +376,14 @@ function Research({
       <InfoRow label="Selected for fetch" value={formatCount(record.selectedForFetchCount)} />
       <InfoRow label="Fetched sources" value={formatCount(record.fetchedPageCount)} />
       <InfoRow label="Extracted sources" value={formatCount(record.extractedCount)} />
-      <InfoRow label="Accepted evidence sources" value={formatCount(record.acceptedEvidenceCount)} />
-      <InfoRow label="Security-rejected sources" value={formatCount(record.securityRejectedCount)} />
+      <InfoRow
+        label="Accepted evidence sources"
+        value={formatCount(record.acceptedEvidenceCount)}
+      />
+      <InfoRow
+        label="Security-rejected sources"
+        value={formatCount(record.securityRejectedCount)}
+      />
       <InfoRow label="Policy-rejected sources" value={formatCount(record.policyRejectedCount)} />
       {getString(record, "failureMessage") ? (
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
@@ -547,10 +553,7 @@ function AgentCard({ agent }: Readonly<{ agent: unknown }>) {
   );
 }
 
-function Report({
-  analysis,
-  run,
-}: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
+function Report({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
   const report = asRecord(run?.report?.report);
   if (!run || !report)
     return (
@@ -643,7 +646,7 @@ function Report({
                     const check = asRecord(item);
                     return (
                       <li key={index}>
-                        {getString(check, "check") ?? "Readiness check failed"}: {" "}
+                        {getString(check, "check") ?? "Readiness check failed"}:{" "}
                         {getString(check, "detail") ?? "required evidence is missing"}
                       </li>
                     );
@@ -693,12 +696,8 @@ function Report({
           Decision readiness: {getString(report, "decisionReadiness") ?? "LOW"} (
           {formatScore(report.decisionReadinessScore)})
         </span>
-        <span>
-          Confidence in sourced facts: {getString(report, "factsConfidence") ?? "LOW"}
-        </span>
-        <span>
-          Confidence in decision: {getString(report, "decisionConfidence") ?? "LOW"}
-        </span>
+        <span>Confidence in sourced facts: {getString(report, "factsConfidence") ?? "LOW"}</span>
+        <span>Confidence in decision: {getString(report, "decisionConfidence") ?? "LOW"}</span>
         {limited ? (
           <span className="font-semibold text-amber-700">Completed with limitations</span>
         ) : null}
