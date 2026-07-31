@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import { z } from "zod";
 import type { Request } from "express";
@@ -37,13 +37,12 @@ export class BillingController {
 
   @Get("usage")
   async usage(@CurrentUser() user: AuthenticatedUser) {
-    const period = this.usageService.billingPeriod();
-    const [aggregates, entitlement] = await Promise.all([
+    const period = await this.usageService.billingPeriodForUser(user.id);
+    const [aggregates, entitlement, resetAt] = await Promise.all([
       this.usageService.aggregates(user.id, period),
       this.billing.entitlementSnapshot(user.id),
+      this.usageService.resetAtForUser(user.id),
     ]);
-    const resetDate = new Date(`${period}-01T00:00:00.000Z`);
-    resetDate.setUTCMonth(resetDate.getUTCMonth() + 1);
     return {
       billingPeriod: period,
       limits: entitlement.entitlements,
@@ -53,7 +52,7 @@ export class BillingController {
         quantity: Number(aggregate.quantity),
       })),
       planCode: entitlement.planCode,
-      resetAt: resetDate.toISOString(),
+      resetAt: resetAt.toISOString(),
     };
   }
 
@@ -79,6 +78,19 @@ export class BillingController {
   @Post("resume")
   resume(@CurrentUser() user: AuthenticatedUser, @Req() request: Request) {
     return this.billing.resume({ requestId: getRequestId(request), userId: user.id });
+  }
+
+  @Post("fake/checkout/:sessionId/complete")
+  completeFakeCheckout(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.billing.completeFakeCheckout({
+      requestId: getRequestId(request),
+      sessionId,
+      userId: user.id,
+    });
   }
 }
 

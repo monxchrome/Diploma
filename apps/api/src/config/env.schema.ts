@@ -131,10 +131,11 @@ export const ApiEnvSchema = z
       .string()
       .regex(/^[A-Z]{3}$/)
       .default("USD"),
+    BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE: BooleanStringSchema,
     BILLING_ENABLED: TrueBooleanStringSchema,
     BILLING_FAKE_PROVIDER_ENABLED: TrueBooleanStringSchema,
     BILLING_FAKE_WEBHOOK_SECRET: z.string().min(32).default(DEFAULT_FAKE_BILLING_SECRET),
-    BILLING_PLAN_CATALOG_VERSION: z.string().min(1).max(100).default("phase-7-v1"),
+    BILLING_PLAN_CATALOG_VERSION: z.string().min(1).max(100).default("phase-8-v1"),
     BILLING_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
     BODY_LIMIT: z.string().default("1mb"),
     BULLMQ_CONNECTION_URL: z.string().url().default("redis://localhost:6379/1"),
@@ -279,6 +280,13 @@ export const ApiEnvSchema = z
           code: "custom",
           message: "TRUSTED_PROXY_COUNT must be configured for production",
           path: ["TRUSTED_PROXY_COUNT"],
+        });
+      }
+      if (env.BILLING_PROVIDER === "fake" && !env.BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE) {
+        context.addIssue({
+          code: "custom",
+          message: "BILLING_PROVIDER=fake is prohibited in production",
+          path: ["BILLING_PROVIDER"],
         });
       }
       if (

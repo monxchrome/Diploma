@@ -358,11 +358,23 @@ class CriticOutput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class TokenUsage(BaseModel):
+    input_tokens: int | None = Field(default=None, alias="inputTokens", ge=0)
+    output_tokens: int | None = Field(default=None, alias="outputTokens", ge=0)
+    estimated_cost_minor_units: int | None = Field(
+        default=None, alias="estimatedCostMinorUnits", ge=0
+    )
+    cost_version: str | None = Field(default=None, alias="costVersion", max_length=100)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class AnalysisExecutionResponse(BaseModel):
     plan: AnalysisPlan | None
     specialist_results: list[SpecialistResult] = Field(alias="specialistResults")
     report: AnalysisReport
     checkpoints: list[str]
     current_stage: str = Field(alias="currentStage")
+    token_usage: TokenUsage | None = Field(default=None, alias="tokenUsage")
 
     model_config = ConfigDict(populate_by_name=True)

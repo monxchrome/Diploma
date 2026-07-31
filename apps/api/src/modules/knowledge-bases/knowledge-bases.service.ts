@@ -73,13 +73,14 @@ export class KnowledgeBasesService {
     name: string;
     description?: string;
   }) {
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
     await this.quota.assertCurrentResourceLimit({
       currentUsage: await this.prisma.knowledgeBase.count({
         where: { projectId: input.projectId, archivedAt: null },
       }),
       entitlement: "maximumKnowledgeBasesPerProject",
       projectId: input.projectId,
-      userId: input.userId,
+      userId: billingOwnerUserId,
     });
     const knowledgeBase = await this.prisma.knowledgeBase.create({
       data: {
@@ -167,11 +168,12 @@ export class KnowledgeBasesService {
   }) {
     this.requireEditor(input.role);
     await this.requireKnowledgeBase(input.projectId, input.knowledgeBaseId);
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
     const validation = this.validateUpload(input.filename, input.declaredMimeType, input.sizeBytes);
     await this.quota.assertUploadSize({
       projectId: input.projectId,
       sizeBytes: input.sizeBytes,
-      userId: input.userId,
+      userId: billingOwnerUserId,
     });
     await this.quota.assertCurrentResourceLimit({
       currentUsage: await this.prisma.document.count({
@@ -179,7 +181,18 @@ export class KnowledgeBasesService {
       }),
       entitlement: "maximumDocumentsPerKnowledgeBase",
       projectId: input.projectId,
-      userId: input.userId,
+      userId: billingOwnerUserId,
+    });
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: await this.prisma.document.count({
+        where: {
+          archivedAt: null,
+          knowledgeBase: { project: { ownerId: billingOwnerUserId } },
+        },
+      }),
+      entitlement: "maximumTotalDocuments",
+      projectId: input.projectId,
+      userId: billingOwnerUserId,
     });
     const documentId = randomUUID();
     const versionId = randomUUID();
@@ -188,7 +201,7 @@ export class KnowledgeBasesService {
       projectId: input.projectId,
       quantity: input.sizeBytes,
       resourceId: `document:${documentId}`,
-      userId: input.userId,
+      userId: billingOwnerUserId,
     });
     const storageKey = `projects/${input.projectId}/knowledge-bases/${input.knowledgeBaseId}/documents/${documentId}/versions/1/${randomUUID()}-${validation.safeFilename}`;
     const result = await this.prisma.$transaction(async (tx) => {
@@ -199,6 +212,7 @@ export class KnowledgeBasesService {
           originalFilename: validation.safeFilename,
           displayName: validation.safeFilename,
           declaredMimeType: input.declaredMimeType,
+          billingOwnerUserId,
           sizeBytes: BigInt(input.sizeBytes),
           createdById: input.userId,
         },
@@ -309,7 +323,7 @@ export class KnowledgeBasesService {
         resourceId: document.id,
         resourceType: "Document",
         unit: "bytes",
-        userId: input.userId,
+        userId: document.billingOwnerUserId,
       },
       resourceId: `document:${document.id}`,
     });
@@ -338,7 +352,9 @@ export class KnowledgeBasesService {
     projectId: string;
     knowledgeBaseId: string;
     documentId: string;
+    requestId: string;
     role: ProjectMemberRole;
+    userId: string;
   }) {
     this.requireEditor(input.role);
     const document = await this.prisma.document.findFirst({
@@ -347,15 +363,39 @@ export class KnowledgeBasesService {
         knowledgeBaseId: input.knowledgeBaseId,
         knowledgeBase: { projectId: input.projectId },
       },
+      include: { currentVersion: true },
     });
     if (!document)
       throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Document not found" });
-    return documentDto(
-      await this.prisma.document.update({
-        where: { id: document.id },
-        data: { archivedAt: new Date(), status: DocumentStatus.ARCHIVED },
-      }),
-    );
+    if (document.currentVersion && document.status !== DocumentStatus.PENDING_UPLOAD) {
+      await this.storage.removeObject(document.currentVersion.storageKey);
+      await this.quota.recordUsage({
+        eventType: "storage.deleted",
+        idempotencyKey: `usage:storage:delete:${document.id}`,
+        metric: "maximumStorageBytes",
+        projectId: input.projectId,
+        quantity: -Number(document.sizeBytes),
+        resourceId: document.id,
+        resourceType: "Document",
+        unit: "byte",
+        userId: document.billingOwnerUserId,
+      });
+    } else {
+      await this.quota.releaseResourceReservation(`document:${document.id}`);
+    }
+    const archived = await this.prisma.document.update({
+      where: { id: document.id },
+      data: { archivedAt: new Date(), status: DocumentStatus.ARCHIVED },
+    });
+    await this.audit.record({
+      action: "document.archived",
+      actorUserId: input.userId,
+      entityId: document.id,
+      entityType: "Document",
+      projectId: input.projectId,
+      requestId: input.requestId,
+    });
+    return documentDto(archived);
   }
   private async requireKnowledgeBase(projectId: string, id: string) {
     const value = await this.prisma.knowledgeBase.findFirst({ where: { id, projectId } });

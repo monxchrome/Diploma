@@ -39,7 +39,7 @@ export class ProjectsService {
     if (this.quota) {
       await this.quota.assertCurrentResourceLimit({
         currentUsage: await this.projectsRepository.countActiveOwnedProjects(data.userId),
-        entitlement: "maximumProjects",
+        entitlement: "maximumOwnedProjects",
         userId: data.userId,
       });
     }

@@ -901,3 +901,86 @@ export const AnalysisSummarySchema = z.object({
   updatedAt: z.string().datetime(),
 });
 export type AnalysisSummary = z.infer<typeof AnalysisSummarySchema>;
+
+export const BillingPlanCodeSchema = z.enum(["FREE", "PRO", "TEAM"]);
+export type BillingPlanCode = z.infer<typeof BillingPlanCodeSchema>;
+
+const BillingLimitSchema = z.number().int().nonnegative();
+
+export const PlanEntitlementsSchema = z.object({
+  maximumOwnedProjects: BillingLimitSchema,
+  maximumMembersPerProject: BillingLimitSchema,
+  maximumKnowledgeBasesPerProject: BillingLimitSchema,
+  maximumDocumentsPerKnowledgeBase: BillingLimitSchema,
+  maximumTotalDocuments: BillingLimitSchema,
+  maximumStorageBytes: BillingLimitSchema,
+  maximumUploadBytesPerFile: BillingLimitSchema,
+  monthlyAnalysisRuns: BillingLimitSchema,
+  monthlySingleAgentRuns: BillingLimitSchema,
+  monthlyMultiAgentRuns: BillingLimitSchema,
+  monthlyExternalResearchQueries: BillingLimitSchema,
+  monthlyFetchedExternalPages: BillingLimitSchema,
+  monthlyExternalBytes: BillingLimitSchema,
+  monthlyExperimentRuns: BillingLimitSchema,
+  maximumExperimentVariants: BillingLimitSchema,
+  maximumExperimentCases: BillingLimitSchema,
+  maximumExperimentRepetitions: BillingLimitSchema,
+  maximumConcurrentAnalysisRuns: BillingLimitSchema,
+  maximumConcurrentResearchRuns: BillingLimitSchema,
+  maximumConcurrentExperimentRuns: BillingLimitSchema,
+  externalResearchAvailable: z.boolean(),
+  experimentsAvailable: z.boolean(),
+  experimentJsonExportAvailable: z.boolean(),
+  experimentCsvExportAvailable: z.boolean(),
+  maximumSavedAnalysisTemplates: BillingLimitSchema,
+  maximumRetentionDays: BillingLimitSchema.nullable(),
+  priorityQueue: z.boolean(),
+  supportLevel: z.enum(["community", "standard", "priority"]),
+});
+export type PlanEntitlements = z.infer<typeof PlanEntitlementsSchema>;
+
+export const PublicBillingPlanSchema = z.object({
+  billingInterval: z.literal("MONTH"),
+  checkoutAvailable: z.boolean(),
+  code: BillingPlanCodeSchema,
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  description: z.string(),
+  displayName: z.string(),
+  displayPrice: z.string(),
+  entitlements: PlanEntitlementsSchema,
+  features: z.array(z.string()),
+  version: z.string(),
+});
+export type PublicBillingPlan = z.infer<typeof PublicBillingPlanSchema>;
+
+export const BillingSubscriptionSchema = z.object({
+  cancelAtPeriodEnd: z.boolean(),
+  currentPeriodEnd: z.string().datetime().nullable(),
+  currentPeriodStart: z.string().datetime().nullable(),
+  planCode: BillingPlanCodeSchema,
+  planVersion: z.string(),
+  status: z.enum([
+    "NONE",
+    "TRIALING",
+    "ACTIVE",
+    "PAST_DUE",
+    "UNPAID",
+    "PAUSED",
+    "CANCELLED",
+    "INCOMPLETE",
+    "EXPIRED",
+  ]),
+  trialEndsAt: z.string().datetime().nullable(),
+});
+export type BillingSubscription = z.infer<typeof BillingSubscriptionSchema>;
+
+export const BillingUsageSchema = z.object({
+  billingPeriod: z.string(),
+  limits: PlanEntitlementsSchema,
+  metrics: z.array(
+    z.object({ metric: z.string(), projectId: z.string().uuid().nullable(), quantity: z.number() }),
+  ),
+  planCode: BillingPlanCodeSchema,
+  resetAt: z.string().datetime(),
+});
+export type BillingUsage = z.infer<typeof BillingUsageSchema>;

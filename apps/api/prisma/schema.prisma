@@ -187,6 +187,12 @@ enum UsageReservationStatus {
   EXPIRED
 }
 
+enum BillingCheckoutStatus {
+  CREATED
+  COMPLETED
+  EXPIRED
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -198,15 +204,22 @@ model SystemCheck {
 }
 
 model PlanDefinition {
-  id           String   @id @default(uuid()) @db.Uuid
-  code         PlanCode
-  version      String
-  name         String
-  description  String
-  entitlements Json
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String   @id @default(uuid()) @db.Uuid
+  code             PlanCode
+  version          String
+  name             String
+  displayName      String
+  description      String
+  billingInterval  String
+  displayPrice     String
+  currency         String
+  providerPriceKey String?
+  features         Json
+  entitlements     Json
+  displayOrder     Int      @default(0)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([code, version])
   @@index([active, code])
@@ -227,9 +240,9 @@ model Subscription {
   id                     String              @id @default(uuid()) @db.Uuid
   userId                 String              @unique @db.Uuid
   billingCustomerId      String?             @unique @db.Uuid
-  planCode               PlanCode             @default(FREE)
+  planCode               PlanCode            @default(FREE)
   planVersion            String
-  provider               BillingProviderName  @default(FAKE)
+  provider               BillingProviderName @default(FAKE)
   providerSubscriptionId String?             @unique
   providerPriceId        String?
   status                 SubscriptionStatus  @default(NONE)
@@ -238,6 +251,7 @@ model Subscription {
   cancelAtPeriodEnd      Boolean             @default(false)
   trialEndsAt            DateTime?
   cancelledAt            DateTime?
+  lastProviderEventAt    DateTime?
   metadata               Json                @default("{}")
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
@@ -246,41 +260,59 @@ model Subscription {
   @@index([status, currentPeriodEnd])
 }
 
+model BillingCheckout {
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @db.Uuid
+  provider          BillingProviderName
+  providerSessionId String                @unique
+  planCode          PlanCode
+  planVersion       String
+  status            BillingCheckoutStatus @default(CREATED)
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([provider, status])
+}
+
 model BillingWebhookEvent {
-  id                 String                     @id @default(uuid()) @db.Uuid
+  id                 String                    @id @default(uuid()) @db.Uuid
   provider           BillingProviderName
   providerEventId    String
   eventType          String
-  status             BillingWebhookEventStatus  @default(RECEIVED)
+  status             BillingWebhookEventStatus @default(RECEIVED)
   payloadHash        String
-  processingAttempts Int                        @default(0)
+  processingAttempts Int                       @default(0)
   processedAt        DateTime?
   failureCode        String?
   failureMessage     String?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
 
   @@unique([provider, providerEventId])
   @@index([status, createdAt])
 }
 
 model UsageEvent {
-  id                       String   @id @default(uuid()) @db.Uuid
-  userId                   String   @db.Uuid
-  projectId                String?  @db.Uuid
-  subscriptionId           String?  @db.Uuid
-  eventType                String
-  resourceType             String
-  resourceId               String
-  quantity                 Decimal  @db.Decimal(18, 6)
-  unit                     String
-  estimatedCostMinorUnits  BigInt?
-  currency                 String?
-  billingPeriod            String
-  idempotencyKey           String   @unique
-  metadata                 Json     @default("{}")
-  occurredAt               DateTime
-  createdAt                DateTime @default(now())
+  id                      String   @id @default(uuid()) @db.Uuid
+  userId                  String   @db.Uuid
+  projectId               String?  @db.Uuid
+  subscriptionId          String?  @db.Uuid
+  eventType               String
+  metric                  String
+  resourceType            String
+  resourceId              String
+  quantity                Decimal  @db.Decimal(18, 6)
+  unit                    String
+  estimatedCostMinorUnits BigInt?
+  currency                String?
+  billingPeriod           String
+  idempotencyKey          String   @unique
+  metadata                Json     @default("{}")
+  occurredAt              DateTime
+  createdAt               DateTime @default(now())
 
   @@index([userId, billingPeriod, eventType])
   @@index([projectId, billingPeriod, eventType])
@@ -302,35 +334,36 @@ model UsageAggregate {
 }
 
 model UsageReservation {
-  id                String                 @id @default(uuid()) @db.Uuid
-  userId            String                 @db.Uuid
-  projectId         String?                @db.Uuid
-  metric            String
-  reservedQuantity  Decimal                @db.Decimal(18, 6)
-  status            UsageReservationStatus @default(ACTIVE)
-  resourceId        String
-  idempotencyKey    String                 @unique
-  expiresAt         DateTime
-  finalizedAt       DateTime?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  id               String                 @id @default(uuid()) @db.Uuid
+  userId           String                 @db.Uuid
+  projectId        String?                @db.Uuid
+  metric           String
+  billingPeriod    String
+  reservedQuantity Decimal                @db.Decimal(18, 6)
+  status           UsageReservationStatus @default(ACTIVE)
+  resourceId       String
+  idempotencyKey   String                 @unique
+  expiresAt        DateTime
+  finalizedAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
-  @@index([userId, projectId, metric, status, expiresAt])
+  @@index([userId, projectId, metric, billingPeriod, status, expiresAt])
   @@index([resourceId])
 }
 
 model EntitlementOverride {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String?  @db.Uuid
-  projectId    String?  @db.Uuid
-  entitlement  String
-  value        Json
-  reason       String
-  createdById  String   @db.Uuid
-  startsAt     DateTime
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String?   @db.Uuid
+  projectId   String?   @db.Uuid
+  entitlement String
+  value       Json
+  reason      String
+  createdById String    @db.Uuid
+  startsAt    DateTime
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId, entitlement, startsAt, expiresAt])
   @@index([projectId, entitlement, startsAt, expiresAt])
@@ -422,23 +455,24 @@ model KnowledgeBase {
 }
 
 model Document {
-  id               String            @id @default(uuid()) @db.Uuid
-  knowledgeBaseId  String            @db.Uuid
-  originalFilename String
-  displayName      String
-  status           DocumentStatus    @default(PENDING_UPLOAD)
-  mimeType         String?
-  declaredMimeType String
-  sizeBytes        BigInt
-  currentVersionId String?           @unique @db.Uuid
-  createdById      String            @db.Uuid
-  archivedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  knowledgeBase    KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  createdBy        User              @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  versions         DocumentVersion[]
-  currentVersion   DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  id                 String            @id @default(uuid()) @db.Uuid
+  knowledgeBaseId    String            @db.Uuid
+  originalFilename   String
+  displayName        String
+  status             DocumentStatus    @default(PENDING_UPLOAD)
+  mimeType           String?
+  declaredMimeType   String
+  sizeBytes          BigInt
+  billingOwnerUserId String            @db.Uuid
+  currentVersionId   String?           @unique @db.Uuid
+  createdById        String            @db.Uuid
+  archivedAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  knowledgeBase      KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  createdBy          User              @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions           DocumentVersion[]
+  currentVersion     DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
 
   @@index([knowledgeBaseId, status, createdAt])
   @@index([knowledgeBaseId, archivedAt])
@@ -618,6 +652,7 @@ model AnalysisRun {
   analysisId            String               @db.Uuid
   projectId             String               @db.Uuid
   userId                String               @db.Uuid
+  billingOwnerUserId    String               @db.Uuid
   status                AnalysisStatus       @default(DRAFT)
   threadId              String               @unique
   graphVersion          String
@@ -651,6 +686,7 @@ model AnalysisRun {
   @@index([analysisId, createdAt])
   @@index([projectId, status, createdAt])
   @@index([userId, status, createdAt])
+  @@index([billingOwnerUserId, status, createdAt])
 }
 
 model AgentRun {
@@ -892,6 +928,7 @@ model Experiment {
   id                    String              @id @default(uuid()) @db.Uuid
   projectId             String              @db.Uuid
   createdById           String              @db.Uuid
+  billingOwnerUserId    String              @db.Uuid
   name                  String
   description           String?
   status                ExperimentStatus    @default(DRAFT)

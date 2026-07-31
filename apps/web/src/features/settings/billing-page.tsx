@@ -2,12 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, ExternalLink } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-provider";
 import { AppShell } from "@/features/shell/app-shell";
 import {
   cancelBillingSubscription,
+  completeFakeCheckout,
   fetchBillingPlans,
   fetchBillingSubscription,
   openBillingPortal,
@@ -18,6 +21,8 @@ import {
 export function BillingPage() {
   const { apiRequest, status } = useAuth();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const completedSessionId = useRef<string | null>(null);
   const enabled = status === "authenticated";
   const plans = useQuery({
     queryKey: ["billing", "plans"],
@@ -46,6 +51,22 @@ export function BillingPage() {
     mutationFn: () => resumeBillingSubscription(apiRequest),
     onSuccess: invalidate,
   });
+  const fakeCheckout = useMutation({
+    mutationFn: (sessionId: string) => completeFakeCheckout(apiRequest, sessionId),
+    onSuccess: invalidate,
+  });
+  const fakeSessionId = searchParams.get("session_id");
+  useEffect(() => {
+    if (
+      !fakeSessionId?.startsWith("fake_checkout_") ||
+      completedSessionId.current === fakeSessionId ||
+      fakeCheckout.isPending
+    ) {
+      return;
+    }
+    completedSessionId.current = fakeSessionId;
+    fakeCheckout.mutate(fakeSessionId);
+  }, [fakeCheckout, fakeSessionId]);
   const current = subscription.data;
 
   return (
@@ -76,21 +97,41 @@ export function BillingPage() {
                   Cancellation is scheduled at period end.
                 </p>
               ) : null}
+              {current?.status === "PAST_DUE" ? (
+                <p className="mt-1 text-sm font-medium text-amber-700">
+                  Payment needs attention. Existing data remains available while the provider
+                  updates status.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               {current && current.planCode !== "FREE" ? (
-                <Button variant="ghost" disabled={portal.isPending} onClick={() => portal.mutate()}>
+                <Button
+                  aria-label="Open billing management portal"
+                  variant="ghost"
+                  disabled={portal.isPending}
+                  onClick={() => portal.mutate()}
+                >
                   <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Manage billing
                 </Button>
               ) : null}
               {current && current.planCode !== "FREE" && !current.cancelAtPeriodEnd ? (
-                <Button variant="ghost" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+                <Button
+                  aria-label="Cancel subscription at period end"
+                  variant="ghost"
+                  disabled={cancel.isPending}
+                  onClick={() => cancel.mutate()}
+                >
                   Cancel at period end
                 </Button>
               ) : null}
               {current && current.planCode !== "FREE" && current.cancelAtPeriodEnd ? (
-                <Button disabled={resume.isPending} onClick={() => resume.mutate()}>
+                <Button
+                  aria-label="Resume subscription"
+                  disabled={resume.isPending}
+                  onClick={() => resume.mutate()}
+                >
                   Resume subscription
                 </Button>
               ) : null}
@@ -103,12 +144,13 @@ export function BillingPage() {
               key={plan.code}
               className="rounded-md border border-slate-200 bg-white p-5 shadow-sm"
             >
-              <h3 className="text-lg font-semibold text-slate-950">{plan.name}</h3>
+              <h3 className="text-lg font-semibold text-slate-950">{plan.displayName}</h3>
               <p className="mt-2 min-h-10 text-sm text-slate-600">{plan.description}</p>
+              <p className="mt-2 text-sm font-medium text-slate-700">{plan.displayPrice}</p>
               <dl className="mt-4 grid gap-2 text-sm text-slate-700">
                 <div className="flex justify-between gap-3">
                   <dt>Projects</dt>
-                  <dd>{String(plan.entitlements.maximumProjects)}</dd>
+                  <dd>{String(plan.entitlements.maximumOwnedProjects)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt>Monthly analyses</dt>
@@ -122,22 +164,33 @@ export function BillingPage() {
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt>Experiments</dt>
-                  <dd>{plan.entitlements.experimentAvailable ? "Included" : "Unavailable"}</dd>
+                  <dd>{plan.entitlements.experimentsAvailable ? "Included" : "Unavailable"}</dd>
                 </div>
               </dl>
               {plan.code === "PRO" || plan.code === "TEAM" ? (
                 <Button
                   className="mt-5 w-full"
+                  aria-label={`Choose ${plan.displayName} plan`}
                   disabled={!plan.checkoutAvailable || checkout.isPending}
                   onClick={() => checkout.mutate(plan.code === "PRO" ? "PRO" : "TEAM")}
                 >
                   <CreditCard className="h-4 w-4" aria-hidden="true" />
-                  Choose {plan.name}
+                  Choose {plan.displayName}
                 </Button>
               ) : null}
             </article>
           ))}
         </div>
+        {checkout.isError ||
+        fakeCheckout.isError ||
+        portal.isError ||
+        cancel.isError ||
+        resume.isError ? (
+          <p className="text-sm font-medium text-rose-700" role="alert">
+            Billing action could not be completed. No plan change is assumed until the provider
+            confirms it.
+          </p>
+        ) : null}
       </section>
     </AppShell>
   );

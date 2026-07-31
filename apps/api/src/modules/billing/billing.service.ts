@@ -1,5 +1,3 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import {
   BadRequestException,
   ConflictException,
@@ -10,16 +8,22 @@ import {
 import { ConfigService } from "@nestjs/config";
 
 import {
+  BillingCheckoutStatus,
   BillingProviderName,
   BillingWebhookEventStatus,
   PlanCode,
   SubscriptionStatus,
 } from "../../generated/prisma/client";
+import { ErrorCodes } from "../../common/errors/error-codes";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { AuditService } from "../audit/audit.service";
-import { ErrorCodes } from "../../common/errors/error-codes";
 import { DeterministicFakeBillingProvider, StripeBillingProvider } from "./billing.providers";
-import type { BillingProvider, ProviderSubscription } from "./billing.types";
+import type {
+  BillingProvider,
+  NormalizedBillingEvent,
+  ProviderSubscription,
+} from "./billing.types";
+import { EntitlementsSchema } from "./billing.types";
 import { EntitlementsService } from "./entitlements.service";
 
 @Injectable()
@@ -47,38 +51,43 @@ export class BillingService {
           ].filter((entry): entry is [string, Exclude<PlanCode, "FREE">] => Boolean(entry[0])),
         ),
       );
-    } else {
-      this.provider = new DeterministicFakeBillingProvider(
-        this.config.getOrThrow<string>("billing.fakeWebhookSecret"),
-      );
+      return;
     }
+    if (!this.config.getOrThrow<boolean>("billing.fakeProviderEnabled")) {
+      throw new Error("The fake billing provider is disabled");
+    }
+    this.provider = new DeterministicFakeBillingProvider(
+      this.config.getOrThrow<string>("billing.fakeWebhookSecret"),
+    );
   }
 
   async plans() {
     const plans = await this.entitlements.getPlans();
-    const configuredPrices = this.config.getOrThrow<{ PRO?: string; TEAM?: string }>(
-      "billing.stripe.priceIds",
-    );
-    const prices: Record<PlanCode, string | undefined> = {
-      FREE: undefined,
-      PRO: configuredPrices.PRO,
-      TEAM: configuredPrices.TEAM,
-    };
     return plans.map((plan) => ({
-      code: plan.code,
-      description: plan.description,
-      entitlements: plan.entitlements,
-      name: plan.name,
-      version: plan.version,
+      billingInterval: plan.billingInterval,
       checkoutAvailable:
         plan.code !== PlanCode.FREE &&
-        (this.provider.providerName === "fake" || Boolean(prices[plan.code])),
+        Boolean(plan.active) &&
+        (this.provider.providerName === "fake" || Boolean(this.trustedPriceId(plan.code))),
+      code: plan.code,
+      currency: plan.currency,
+      description: plan.description,
+      displayName: plan.displayName,
+      displayPrice: plan.displayPrice,
+      entitlements: EntitlementsSchema.parse(plan.entitlements),
+      features: stringList(plan.features),
+      version: plan.version,
     }));
   }
 
   async subscription(userId: string) {
     const subscription = await this.entitlements.ensureFreeSubscription(userId);
-    return this.publicSubscription(subscription);
+    const effective = await this.entitlements.getEntitlements({ userId });
+    return this.publicSubscription({
+      ...subscription,
+      planCode: effective.planCode,
+      planVersion: effective.planVersion,
+    });
   }
 
   async entitlementSnapshot(userId: string) {
@@ -96,20 +105,40 @@ export class BillingService {
         message: "Billing is disabled",
       });
     }
-    const customer = await this.ensureCustomer(input.userId);
-    const priceId = this.trustedPriceId(input.planCode);
+    const [plan, user] = await Promise.all([
+      this.entitlements.latestActiveDefinition(input.planCode),
+      this.prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } }),
+    ]);
+    if (!user)
+      throw new NotFoundException({ code: ErrorCodes.NotFound, message: "User not found" });
+    const customer = await this.ensureCustomer({ email: user.email, userId: input.userId });
     const result = await this.provider.createCheckoutSession({
-      cancelUrl:
-        this.config.get<string>("billing.stripe.cancelUrl") ??
-        `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`,
-      customerId: customer.providerCustomerId,
-      idempotencyKey: `checkout:${input.userId}:${input.planCode}:${randomUUID()}`,
-      metadata: { dip_plan_code: input.planCode, dip_user_id: input.userId },
+      cancelUrl: this.cancelUrl(),
+      email: user.email,
+      idempotencyKey: `checkout:${input.userId}:${input.planCode}:${input.requestId}`,
+      metadata: {
+        dip_plan_code: input.planCode,
+        dip_plan_version: plan.version,
+        dip_user_id: input.userId,
+      },
       planCode: input.planCode,
-      priceId,
-      successUrl:
-        this.config.get<string>("billing.stripe.successUrl") ??
-        `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`,
+      planVersion: plan.version,
+      providerCustomerId: customer.providerCustomerId,
+      successUrl: this.successUrl(),
+      trustedPriceId: this.trustedPriceId(input.planCode),
+      userId: input.userId,
+    });
+    await this.prisma.billingCheckout.upsert({
+      where: { providerSessionId: result.sessionId },
+      create: {
+        expiresAt: result.expiresAt,
+        planCode: input.planCode,
+        planVersion: plan.version,
+        provider: this.providerEnum(),
+        providerSessionId: result.sessionId,
+        userId: input.userId,
+      },
+      update: { expiresAt: result.expiresAt },
     });
     await this.audit.record({
       action: "billing.checkout.created",
@@ -120,6 +149,38 @@ export class BillingService {
       requestId: input.requestId,
     });
     return result;
+  }
+
+  async completeFakeCheckout(input: { requestId: string; sessionId: string; userId: string }) {
+    if (
+      this.provider.providerName !== "fake" ||
+      this.config.getOrThrow<string>("app.environment") === "production" ||
+      !this.config.getOrThrow<boolean>("billing.fakeProviderEnabled")
+    ) {
+      throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Checkout not found" });
+    }
+    const checkout = await this.prisma.billingCheckout.findFirst({
+      where: {
+        provider: BillingProviderName.FAKE,
+        providerSessionId: input.sessionId,
+        status: BillingCheckoutStatus.CREATED,
+        userId: input.userId,
+      },
+    });
+    if (!checkout)
+      throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Checkout not found" });
+    const event = this.fakeProvider().completeCheckout({
+      planCode: checkout.planCode as Exclude<PlanCode, "FREE">,
+      planVersion: checkout.planVersion,
+      sessionId: checkout.providerSessionId,
+      userId: input.userId,
+    });
+    await this.processEvent(event, input.requestId);
+    await this.prisma.billingCheckout.update({
+      where: { id: checkout.id },
+      data: { completedAt: new Date(), status: BillingCheckoutStatus.COMPLETED },
+    });
+    return this.subscription(input.userId);
   }
 
   async portal(input: { requestId: string; userId: string }) {
@@ -133,10 +194,8 @@ export class BillingService {
       });
     }
     const result = await this.provider.createCustomerPortalSession({
-      customerId: customer.providerCustomerId,
-      returnUrl:
-        this.config.get<string>("billing.stripe.portalReturnUrl") ??
-        `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`,
+      providerCustomerId: customer.providerCustomerId,
+      returnUrl: this.portalReturnUrl(),
     });
     await this.audit.record({
       action: "billing.portal.created",
@@ -154,9 +213,9 @@ export class BillingService {
     if (!providerSubscriptionId)
       throw new Error("Managed subscription is missing a provider identifier");
     const update = await this.provider.cancelSubscriptionAtPeriodEnd(providerSubscriptionId);
-    const saved = await this.persistSubscription(input.userId, update);
+    const saved = await this.persistSubscription(input.userId, update, new Date());
     await this.audit.record({
-      action: "billing.subscription.cancelled",
+      action: "billing.subscription.cancel_requested",
       actorUserId: input.userId,
       entityId: saved.id,
       entityType: "Subscription",
@@ -172,9 +231,9 @@ export class BillingService {
     if (!providerSubscriptionId)
       throw new Error("Managed subscription is missing a provider identifier");
     const update = await this.provider.resumeSubscription(providerSubscriptionId);
-    const saved = await this.persistSubscription(input.userId, update);
+    const saved = await this.persistSubscription(input.userId, update, new Date());
     await this.audit.record({
-      action: "billing.subscription.resumed",
+      action: "billing.subscription.resume_requested",
       actorUserId: input.userId,
       entityId: saved.id,
       entityType: "Subscription",
@@ -198,62 +257,7 @@ export class BillingService {
       });
     }
     const event = this.provider.parseWebhookEvent(input.rawBody, input.signature);
-    const payloadHash = createHash("sha256").update(input.rawBody).digest("hex");
-    try {
-      await this.prisma.billingWebhookEvent.create({
-        data: {
-          provider: this.providerEnum(),
-          providerEventId: event.eventId,
-          eventType: event.eventType,
-          payloadHash,
-        },
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) {
-        await this.audit.record({
-          action: "billing.webhook.duplicate",
-          entityType: "BillingWebhookEvent",
-          metadata: { provider: this.provider.providerName },
-          requestId: input.requestId,
-        });
-        return { duplicate: true, received: true };
-      }
-      throw error;
-    }
-    try {
-      if (event.subscription)
-        await this.applyProviderSubscription(event.eventType, event.subscription, input.requestId);
-      await this.prisma.billingWebhookEvent.update({
-        where: {
-          provider_providerEventId: {
-            provider: this.providerEnum(),
-            providerEventId: event.eventId,
-          },
-        },
-        data: {
-          status: BillingWebhookEventStatus.PROCESSED,
-          processedAt: new Date(),
-          processingAttempts: 1,
-        },
-      });
-      return { duplicate: false, received: true };
-    } catch (error) {
-      await this.prisma.billingWebhookEvent.update({
-        where: {
-          provider_providerEventId: {
-            provider: this.providerEnum(),
-            providerEventId: event.eventId,
-          },
-        },
-        data: {
-          status: BillingWebhookEventStatus.FAILED,
-          processingAttempts: 1,
-          failureCode: "WEBHOOK_PROCESSING_FAILED",
-          failureMessage: "Subscription update could not be applied",
-        },
-      });
-      throw error;
-    }
+    return this.processEvent(event, input.requestId);
   }
 
   async health() {
@@ -264,7 +268,10 @@ export class BillingService {
     return {
       planCatalogLoaded: plans.length === 3,
       priceMappingValid:
-        this.provider.providerName === "fake" || Boolean(this.trustedPriceId(PlanCode.PRO)),
+        this.provider.providerName === "fake" ||
+        plans
+          .filter((plan) => plan.code !== PlanCode.FREE)
+          .every((plan) => Boolean(this.trustedPriceId(plan.code as Exclude<PlanCode, "FREE">))),
       provider: this.provider.providerName,
       ready: provider.ready && plans.length === 3,
       webhookConfigured:
@@ -273,98 +280,186 @@ export class BillingService {
     };
   }
 
-  private async ensureCustomer(userId: string) {
-    const current = await this.prisma.billingCustomer.findUnique({ where: { userId } });
+  private async processEvent(event: NormalizedBillingEvent, requestId: string) {
+    const created = await this.prisma.billingWebhookEvent
+      .create({
+        data: {
+          eventType: event.eventType,
+          payloadHash: event.payloadHash,
+          provider: this.providerEnum(),
+          providerEventId: event.providerEventId,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) return null;
+        throw error;
+      });
+    if (!created) {
+      await this.audit.record({
+        action: "billing.webhook.duplicate",
+        entityType: "BillingWebhookEvent",
+        metadata: { provider: this.provider.providerName },
+        requestId,
+      });
+      return { duplicate: true, received: true };
+    }
+    try {
+      const applied = event.subscription
+        ? await this.applyProviderSubscription(event, requestId)
+        : false;
+      if (event.eventType === "checkout.session.completed") {
+        await this.prisma.billingCheckout.updateMany({
+          where: {
+            provider: this.providerEnum(),
+            providerSessionId: event.checkoutSessionId ?? "",
+          },
+          data: { completedAt: new Date(), status: BillingCheckoutStatus.COMPLETED },
+        });
+      }
+      await this.prisma.billingWebhookEvent.update({
+        where: { id: created.id },
+        data: {
+          processedAt: new Date(),
+          processingAttempts: 1,
+          status:
+            applied || !event.subscription
+              ? BillingWebhookEventStatus.PROCESSED
+              : BillingWebhookEventStatus.REJECTED,
+        },
+      });
+      return { duplicate: false, received: true };
+    } catch (error) {
+      await this.prisma.billingWebhookEvent.update({
+        where: { id: created.id },
+        data: {
+          failureCode: "WEBHOOK_PROCESSING_FAILED",
+          failureMessage: "Subscription update could not be applied",
+          processingAttempts: 1,
+          status: BillingWebhookEventStatus.FAILED,
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async ensureCustomer(input: { email: string; userId: string }) {
+    const current = await this.prisma.billingCustomer.findUnique({
+      where: { userId: input.userId },
+    });
     if (current?.provider === this.providerEnum()) return current;
-    const providerCustomerId = await this.provider.createCustomer({
-      idempotencyKey: `customer:${userId}:${this.provider.providerName}`,
-      userId,
+    const providerCustomerId = await this.provider.createOrGetCustomer({
+      email: input.email,
+      idempotencyKey: `customer:${input.userId}:${this.provider.providerName}`,
+      userId: input.userId,
     });
     return this.prisma.billingCustomer.upsert({
-      where: { userId },
-      create: { userId, provider: this.providerEnum(), providerCustomerId },
+      where: { userId: input.userId },
+      create: { provider: this.providerEnum(), providerCustomerId, userId: input.userId },
       update: { provider: this.providerEnum(), providerCustomerId },
     });
   }
 
   private async applyProviderSubscription(
-    eventType: string,
-    providerSubscription: ProviderSubscription,
+    event: NormalizedBillingEvent,
     requestId: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    const providerSubscription = event.subscription;
+    if (!providerSubscription) return false;
     const userId = providerSubscription.metadata.dip_user_id;
-    if (!userId) throw new Error("Provider subscription is missing trusted user metadata");
+    const planVersion = providerSubscription.planVersion;
+    if (!userId || !planVersion) return false;
+    if (
+      providerSubscription.metadata.dip_plan_code !== providerSubscription.planCode ||
+      providerSubscription.metadata.dip_plan_version !== planVersion
+    ) {
+      return false;
+    }
+    const customer = await this.prisma.billingCustomer.findUnique({ where: { userId } });
+    if (
+      !customer ||
+      customer.provider !== this.providerEnum() ||
+      customer.providerCustomerId !== providerSubscription.customerId
+    ) {
+      return false;
+    }
+    await this.entitlements.definition(providerSubscription.planCode, planVersion);
     const existing = await this.prisma.subscription.findUnique({ where: { userId } });
     if (
-      existing?.currentPeriodEnd &&
-      providerSubscription.currentPeriodEnd &&
-      existing.currentPeriodEnd > providerSubscription.currentPeriodEnd
+      event.providerCreatedAt &&
+      existing?.lastProviderEventAt &&
+      event.providerCreatedAt < existing.lastProviderEventAt
     ) {
-      return;
+      return true;
     }
-    await this.persistSubscription(userId, providerSubscription);
-    const action = eventType.includes("payment_failed")
-      ? "billing.payment_failed"
-      : providerSubscription.cancelAtPeriodEnd
-        ? "billing.subscription.cancelled"
-        : "billing.subscription.updated";
+    const saved = await this.persistSubscription(
+      userId,
+      providerSubscription,
+      event.providerCreatedAt ?? new Date(),
+      customer.id,
+    );
+    const action =
+      event.eventType === "invoice.payment_failed"
+        ? "billing.payment_failed"
+        : providerSubscription.cancelAtPeriodEnd
+          ? "billing.subscription.cancelled"
+          : "billing.subscription.updated";
     await this.audit.record({
       action,
       actorUserId: userId,
-      entityId: providerSubscription.providerSubscriptionId,
+      entityId: saved.id,
       entityType: "Subscription",
       metadata: { planCode: providerSubscription.planCode, status: providerSubscription.status },
       requestId,
     });
+    return true;
   }
 
-  private async persistSubscription(userId: string, value: ProviderSubscription) {
-    const customer = value.customerId
-      ? await this.prisma.billingCustomer.upsert({
-          where: { userId },
-          create: {
-            userId,
-            provider: this.providerEnum(),
-            providerCustomerId: value.customerId,
-          },
-          update: {
-            provider: this.providerEnum(),
-            providerCustomerId: value.customerId,
-          },
-        })
-      : null;
+  private async persistSubscription(
+    userId: string,
+    value: ProviderSubscription,
+    providerEventAt: Date,
+    billingCustomerId?: string,
+  ) {
+    const customer = billingCustomerId
+      ? { id: billingCustomerId }
+      : await this.prisma.billingCustomer.findUnique({ where: { userId } });
+    if (!customer) throw new Error("Billing customer was not found");
+    const planVersion = value.planVersion;
+    if (!planVersion) throw new Error("Provider subscription is missing the plan version");
     return this.prisma.subscription.upsert({
       where: { userId },
       create: {
-        userId,
-        billingCustomerId: customer?.id,
-        planCode: value.planCode,
-        planVersion: this.entitlements.catalogVersion(),
-        provider: this.providerEnum(),
-        providerSubscriptionId: value.providerSubscriptionId,
-        providerPriceId: value.priceId,
-        status: value.status,
-        currentPeriodStart: value.currentPeriodStart,
-        currentPeriodEnd: value.currentPeriodEnd,
+        billingCustomerId: customer.id,
         cancelAtPeriodEnd: value.cancelAtPeriodEnd,
-        trialEndsAt: value.trialEndsAt,
         cancelledAt: value.status === SubscriptionStatus.CANCELLED ? new Date() : null,
+        currentPeriodEnd: value.currentPeriodEnd,
+        currentPeriodStart: value.currentPeriodStart,
+        lastProviderEventAt: providerEventAt,
         metadata: value.metadata,
+        planCode: value.planCode,
+        planVersion,
+        provider: this.providerEnum(),
+        providerPriceId: value.priceId,
+        providerSubscriptionId: value.providerSubscriptionId,
+        status: value.status,
+        trialEndsAt: value.trialEndsAt,
+        userId,
       },
       update: {
-        billingCustomerId: customer?.id,
-        planCode: value.planCode,
-        planVersion: this.entitlements.catalogVersion(),
-        provider: this.providerEnum(),
-        providerSubscriptionId: value.providerSubscriptionId,
-        providerPriceId: value.priceId,
-        status: value.status,
-        currentPeriodStart: value.currentPeriodStart,
-        currentPeriodEnd: value.currentPeriodEnd,
+        billingCustomerId: customer.id,
         cancelAtPeriodEnd: value.cancelAtPeriodEnd,
-        trialEndsAt: value.trialEndsAt,
         cancelledAt: value.status === SubscriptionStatus.CANCELLED ? new Date() : null,
+        currentPeriodEnd: value.currentPeriodEnd,
+        currentPeriodStart: value.currentPeriodStart,
+        lastProviderEventAt: providerEventAt,
         metadata: value.metadata,
+        planCode: value.planCode,
+        planVersion,
+        provider: this.providerEnum(),
+        providerPriceId: value.priceId,
+        providerSubscriptionId: value.providerSubscriptionId,
+        status: value.status,
+        trialEndsAt: value.trialEndsAt,
       },
     });
   }
@@ -385,11 +480,12 @@ export class BillingService {
     const priceId = this.config.getOrThrow<{ PRO?: string; TEAM?: string }>(
       "billing.stripe.priceIds",
     )[planCode];
-    if (!priceId)
+    if (!priceId) {
       throw new ConflictException({
         code: ErrorCodes.BillingUnavailable,
         message: "Plan is unavailable",
       });
+    }
     return priceId;
   }
 
@@ -397,6 +493,34 @@ export class BillingService {
     return this.provider.providerName === "stripe"
       ? BillingProviderName.STRIPE
       : BillingProviderName.FAKE;
+  }
+
+  private fakeProvider(): DeterministicFakeBillingProvider {
+    if (!(this.provider instanceof DeterministicFakeBillingProvider)) {
+      throw new Error("The fake billing provider is unavailable");
+    }
+    return this.provider;
+  }
+
+  private successUrl(): string {
+    return (
+      this.config.get<string>("billing.stripe.successUrl") ??
+      `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`
+    );
+  }
+
+  private cancelUrl(): string {
+    return (
+      this.config.get<string>("billing.stripe.cancelUrl") ??
+      `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`
+    );
+  }
+
+  private portalReturnUrl(): string {
+    return (
+      this.config.get<string>("billing.stripe.portalReturnUrl") ??
+      `${this.config.getOrThrow<string>("app.baseUrl")}/settings/billing`
+    );
   }
 
   private publicSubscription(subscription: {
@@ -422,4 +546,10 @@ export class BillingService {
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }

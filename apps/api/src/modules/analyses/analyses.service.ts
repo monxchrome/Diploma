@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { InjectQueue } from "@nestjs/bullmq";
-import { HttpException, HttpStatus, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { HttpException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   AnalysisReportSchema,
@@ -176,40 +176,76 @@ export class AnalysesService {
         },
       });
     }
-    await this.enforceLimits(input.projectId, input.userId);
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
     const id = randomUUID();
-    await this.quota.reserve({
-      metric: "monthlyAnalysisRuns",
-      projectId: input.projectId,
-      quantity: 1,
-      resourceId: `analysis:${id}`,
-      userId: input.userId,
-    });
-    if (analysis.externalResearchEnabled) {
-      await this.quota.assertFeature({
-        feature: "externalResearchAvailable",
+    const modeMetric =
+      analysis.mode === "MULTI_AGENT" ? "monthlyMultiAgentRuns" : "monthlySingleAgentRuns";
+    try {
+      await this.quota.reserve({
+        metric: "monthlyAnalysisRuns",
         projectId: input.projectId,
-        userId: input.userId,
+        quantity: 1,
+        resourceId: `analysis:${id}`,
+        userId: billingOwnerUserId,
       });
       await this.quota.reserve({
-        metric: "monthlyExternalResearchQueries",
+        metric: modeMetric,
         projectId: input.projectId,
-        quantity: this.config.getOrThrow<number>("research.maximumQueries"),
-        resourceId: `research:${id}:queries`,
-        userId: input.userId,
+        quantity: 1,
+        resourceId: `analysis:${id}:mode`,
+        userId: billingOwnerUserId,
       });
       await this.quota.reserve({
-        metric: "monthlyFetchedExternalPages",
+        metric: "maximumConcurrentAnalysisRuns",
         projectId: input.projectId,
-        quantity: this.config.getOrThrow<number>("research.maximumFetchedPages"),
-        resourceId: `research:${id}:pages`,
-        userId: input.userId,
+        quantity: 1,
+        resourceId: `analysis:${id}:concurrent`,
+        userId: billingOwnerUserId,
       });
+      if (analysis.externalResearchEnabled || analysis.evidenceMode !== "INTERNAL_ONLY") {
+        await this.quota.assertFeature({
+          feature: "externalResearchAvailable",
+          projectId: input.projectId,
+          userId: billingOwnerUserId,
+        });
+        await this.quota.reserve({
+          metric: "monthlyExternalResearchQueries",
+          projectId: input.projectId,
+          quantity: this.config.getOrThrow<number>("research.maximumQueries"),
+          resourceId: `research:${id}:queries`,
+          userId: billingOwnerUserId,
+        });
+        await this.quota.reserve({
+          metric: "monthlyFetchedExternalPages",
+          projectId: input.projectId,
+          quantity: this.config.getOrThrow<number>("research.maximumFetchedPages"),
+          resourceId: `research:${id}:pages`,
+          userId: billingOwnerUserId,
+        });
+        await this.quota.reserve({
+          metric: "monthlyExternalBytes",
+          projectId: input.projectId,
+          quantity: this.config.getOrThrow<number>("research.maximumTotalBytes"),
+          resourceId: `research:${id}:bytes`,
+          userId: billingOwnerUserId,
+        });
+      }
+    } catch (error) {
+      await Promise.all([
+        this.quota.releaseResourceReservation(`analysis:${id}`),
+        this.quota.releaseResourceReservation(`analysis:${id}:mode`),
+        this.quota.releaseResourceReservation(`analysis:${id}:concurrent`),
+        this.quota.releaseResourceReservation(`research:${id}:queries`),
+        this.quota.releaseResourceReservation(`research:${id}:pages`),
+        this.quota.releaseResourceReservation(`research:${id}:bytes`),
+      ]);
+      throw error;
     }
     const run = await this.prisma.analysisRun.create({
       data: {
         id,
         analysisId: analysis.id,
+        billingOwnerUserId,
         projectId: input.projectId,
         userId: input.userId,
         status: AnalysisStatus.QUEUED,
@@ -253,6 +289,7 @@ export class AnalysesService {
       data: { cancellationRequested: true },
     });
     await this.research.cancelForAnalysisRun(run.id, input.requestId);
+    await this.quota.releaseResourceReservation(`analysis:${run.id}:concurrent`);
     if (run.status === AnalysisStatus.QUEUED) {
       await this.prisma.analysisRun.update({
         where: { id: run.id },
@@ -461,6 +498,7 @@ export class AnalysesService {
             initialRetrievalRunId:
               run.analysis.evidenceMode === "EXTERNAL_ONLY" ? null : retrievalRunId,
             completedAt: new Date(),
+            tokenUsage: result.tokenUsage ?? {},
           },
         });
         for (const specialist of result.specialistResults) {
@@ -537,21 +575,40 @@ export class AnalysesService {
           resourceId: run.id,
           resourceType: "AnalysisRun",
           unit: "run",
-          userId: run.userId,
+          userId: run.billingOwnerUserId,
         },
         resourceId: `analysis:${run.id}`,
       });
+      await this.quota.finalizeReservation({
+        event: {
+          eventType: modeMetricForRun(run.analysis.mode),
+          idempotencyKey: `usage:analysis:mode:${run.id}`,
+          metric: modeMetricForRun(run.analysis.mode),
+          projectId: run.projectId,
+          quantity: 1,
+          resourceId: run.id,
+          resourceType: "AnalysisRun",
+          unit: "run",
+          userId: run.billingOwnerUserId,
+        },
+        resourceId: `analysis:${run.id}:mode`,
+      });
+      await this.quota.releaseResourceReservation(`analysis:${run.id}:concurrent`);
+      await this.recordModelUsage(run, result.tokenUsage);
       if (researchRun) {
         await this.finalizeResearchUsage({
           analysisRunId: run.id,
           projectId: run.projectId,
-          userId: run.userId,
+          userId: run.billingOwnerUserId,
         });
       }
     } catch (error) {
       await this.quota.releaseResourceReservation(`analysis:${run.id}`);
+      await this.quota.releaseResourceReservation(`analysis:${run.id}:mode`);
+      await this.quota.releaseResourceReservation(`analysis:${run.id}:concurrent`);
       await this.quota.releaseResourceReservation(`research:${run.id}:queries`);
       await this.quota.releaseResourceReservation(`research:${run.id}:pages`);
+      await this.quota.releaseResourceReservation(`research:${run.id}:bytes`);
       const failure = this.classifyExecutionFailure(error);
       await this.prisma.analysisRun.update({
         where: { id: run.id },
@@ -605,6 +662,84 @@ export class AnalysesService {
       },
       resourceId: `research:${input.analysisRunId}:pages`,
     });
+    await this.quota.finalizeReservation({
+      event: {
+        eventType: "monthlyExternalBytes",
+        idempotencyKey: `usage:research:bytes:${input.analysisRunId}`,
+        metric: "monthlyExternalBytes",
+        projectId: input.projectId,
+        quantity: researchRun.totalFetchedBytes,
+        resourceId: input.analysisRunId,
+        resourceType: "ResearchRun",
+        unit: "byte",
+        userId: input.userId,
+      },
+      resourceId: `research:${input.analysisRunId}:bytes`,
+    });
+  }
+
+  private async recordModelUsage(
+    run: { billingOwnerUserId: string; id: string; projectId: string },
+    tokenUsage:
+      | {
+          costVersion: string | null;
+          estimatedCostMinorUnits: number | null;
+          inputTokens: number | null;
+          outputTokens: number | null;
+        }
+      | null
+      | undefined,
+  ): Promise<void> {
+    if (!tokenUsage) return;
+    const events = [];
+    if (tokenUsage.inputTokens !== null && tokenUsage.inputTokens > 0) {
+      events.push(
+        this.quota.recordUsage({
+          eventType: "model.input_tokens",
+          idempotencyKey: `usage:model:input:${run.id}`,
+          metric: "modelInputTokens",
+          projectId: run.projectId,
+          quantity: tokenUsage.inputTokens,
+          resourceId: run.id,
+          resourceType: "AnalysisRun",
+          unit: "token",
+          userId: run.billingOwnerUserId,
+        }),
+      );
+    }
+    if (tokenUsage.outputTokens !== null && tokenUsage.outputTokens > 0) {
+      events.push(
+        this.quota.recordUsage({
+          eventType: "model.output_tokens",
+          idempotencyKey: `usage:model:output:${run.id}`,
+          metric: "modelOutputTokens",
+          projectId: run.projectId,
+          quantity: tokenUsage.outputTokens,
+          resourceId: run.id,
+          resourceType: "AnalysisRun",
+          unit: "token",
+          userId: run.billingOwnerUserId,
+        }),
+      );
+    }
+    if (tokenUsage.estimatedCostMinorUnits !== null && tokenUsage.estimatedCostMinorUnits > 0) {
+      events.push(
+        this.quota.recordUsage({
+          estimatedCostMinorUnits: BigInt(tokenUsage.estimatedCostMinorUnits),
+          eventType: "model.estimated_cost",
+          idempotencyKey: `usage:model:cost:${run.id}`,
+          metadata: { costVersion: tokenUsage.costVersion },
+          metric: "estimatedModelCost",
+          projectId: run.projectId,
+          quantity: tokenUsage.estimatedCostMinorUnits,
+          resourceId: run.id,
+          resourceType: "AnalysisRun",
+          unit: "minor_currency_unit",
+          userId: run.billingOwnerUserId,
+        }),
+      );
+    }
+    await Promise.all(events);
   }
 
   private async requireScope(projectId: string, body: CreateAnalysisRequest): Promise<void> {
@@ -630,21 +765,6 @@ export class AnalysesService {
     }
   }
 
-  private async enforceLimits(projectId: string, userId: string): Promise<void> {
-    const [perProject, perUser] = await Promise.all([
-      this.prisma.analysisRun.count({ where: { projectId, status: { in: ACTIVE } } }),
-      this.prisma.analysisRun.count({ where: { userId, status: { in: ACTIVE } } }),
-    ]);
-    if (
-      perProject >= this.config.getOrThrow<number>("analysis.maxConcurrentPerProject") ||
-      perUser >= this.config.getOrThrow<number>("analysis.maxConcurrentPerUser")
-    )
-      throw new HttpException(
-        { code: ErrorCodes.AccessDenied, message: "Analysis concurrency limit reached" },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-  }
-
   private async cancelRun(runId: string): Promise<void> {
     await this.prisma.analysisRun.update({
       where: { id: runId },
@@ -654,6 +774,7 @@ export class AnalysesService {
         completedAt: new Date(),
       },
     });
+    await this.quota.releaseResourceReservation(`analysis:${runId}:concurrent`);
   }
   private classifyExecutionFailure(error: unknown): { code: string; message: string } {
     const serialized =
@@ -689,4 +810,17 @@ const AnalysisExecutionSchema = z.object({
   report: AnalysisReportSchema,
   checkpoints: z.array(z.string()),
   currentStage: z.string(),
+  tokenUsage: z
+    .object({
+      inputTokens: z.number().int().nonnegative().nullable(),
+      outputTokens: z.number().int().nonnegative().nullable(),
+      estimatedCostMinorUnits: z.number().int().nonnegative().nullable(),
+      costVersion: z.string().max(100).nullable(),
+    })
+    .nullable()
+    .optional(),
 });
+
+function modeMetricForRun(mode: "SINGLE_AGENT" | "MULTI_AGENT") {
+  return mode === "MULTI_AGENT" ? "monthlyMultiAgentRuns" : "monthlySingleAgentRuns";
+}

@@ -141,16 +141,20 @@ export class KnowledgeBasesController {
     return this.service.getDocument(projectId, knowledgeBaseId, documentId);
   }
   @Delete(":knowledgeBaseId/documents/:documentId") deleteDocument(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentProjectAccess() access: ProjectAccess,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("knowledgeBaseId", ParseUUIDPipe) knowledgeBaseId: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Req() request: Request,
   ) {
     return this.service.archiveDocument({
       documentId,
       knowledgeBaseId,
       projectId,
+      requestId: getRequestId(request),
       role: access.role,
+      userId: user.id,
     });
   }
 }

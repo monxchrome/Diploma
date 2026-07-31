@@ -35,4 +35,17 @@ describe("API environment validation", () => {
       }),
     ).toThrow();
   });
+
+  it("rejects the deterministic fake billing provider in production by default", () => {
+    expect(() =>
+      validateApiEnv({
+        AUTH_COOKIE_SECURE: "true",
+        BILLING_FAKE_WEBHOOK_SECRET: "fake-webhook-secret-for-test-only",
+        BILLING_PROVIDER: "fake",
+        JWT_ACCESS_SECRET: "a-production-access-secret-with-adequate-length",
+        NODE_ENV: "production",
+        REFRESH_TOKEN_PEPPER: "a-production-refresh-pepper-with-adequate-length",
+      }),
+    ).toThrow();
+  });
 });

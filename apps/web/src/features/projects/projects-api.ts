@@ -1,5 +1,7 @@
 import {
   AuthSessionSummarySchema,
+  BillingSubscriptionSchema,
+  BillingUsageSchema,
   KnowledgeBaseSchema,
   DocumentSchema,
   PaginatedResponseSchema,
@@ -9,6 +11,7 @@ import {
   SafeUserSchema,
   SystemStatusResponseSchema,
   AskResponseSchema,
+  PublicBillingPlanSchema,
   ResearchPolicySchema,
   SearchResponseSchema,
   type AskResponse,
@@ -31,32 +34,6 @@ export const ProjectsPageSchema = PaginatedResponseSchema(ProjectSummarySchema);
 export const ProjectMembersSchema = z.array(ProjectMemberSchema);
 export const AuthSessionsSchema = z.array(AuthSessionSummarySchema);
 export const KnowledgeBasesSchema = z.array(KnowledgeBaseSchema);
-export const BillingPlanSchema = z.object({
-  checkoutAvailable: z.boolean(),
-  code: z.enum(["FREE", "PRO", "TEAM"]),
-  description: z.string(),
-  entitlements: z.record(z.string(), z.union([z.boolean(), z.number()])),
-  name: z.string(),
-  version: z.string(),
-});
-export const BillingSubscriptionSchema = z.object({
-  cancelAtPeriodEnd: z.boolean(),
-  currentPeriodEnd: z.string().datetime().nullable(),
-  currentPeriodStart: z.string().datetime().nullable(),
-  planCode: z.enum(["FREE", "PRO", "TEAM"]),
-  planVersion: z.string(),
-  status: z.string(),
-  trialEndsAt: z.string().datetime().nullable(),
-});
-export const BillingUsageSchema = z.object({
-  billingPeriod: z.string(),
-  limits: z.record(z.string(), z.union([z.boolean(), z.number()])),
-  metrics: z.array(
-    z.object({ metric: z.string(), projectId: z.string().uuid().nullable(), quantity: z.number() }),
-  ),
-  planCode: z.enum(["FREE", "PRO", "TEAM"]),
-  resetAt: z.string().datetime(),
-});
 const jsonTextList = z.array(z.string()).catch([]);
 const jsonIdList = z.array(z.string().uuid()).catch([]);
 
@@ -439,7 +416,7 @@ export function fetchApiStatus(apiRequest: ApiRequest) {
 }
 
 export function fetchBillingPlans(apiRequest: ApiRequest) {
-  return apiRequest("/api/billing/plans", z.array(BillingPlanSchema));
+  return apiRequest("/api/billing/plans", z.array(PublicBillingPlanSchema));
 }
 
 export function fetchBillingSubscription(apiRequest: ApiRequest) {
@@ -453,15 +430,34 @@ export function fetchBillingUsage(apiRequest: ApiRequest) {
 export function startCheckout(apiRequest: ApiRequest, planCode: "PRO" | "TEAM") {
   return apiRequest(
     "/api/billing/checkout",
-    z.object({ checkoutUrl: z.string().url(), sessionId: z.string() }),
+    z.object({
+      checkoutUrl: z.string().url(),
+      expiresAt: z.string().datetime().nullable(),
+      provider: z.enum(["fake", "stripe"]),
+      sessionId: z.string(),
+    }),
     { body: { planCode }, method: "POST" },
   );
 }
 
 export function openBillingPortal(apiRequest: ApiRequest) {
-  return apiRequest("/api/billing/portal", z.object({ portalUrl: z.string().url() }), {
-    method: "POST",
-  });
+  return apiRequest(
+    "/api/billing/portal",
+    z.object({ expiresAt: z.string().datetime().nullable(), portalUrl: z.string().url() }),
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function completeFakeCheckout(apiRequest: ApiRequest, sessionId: string) {
+  return apiRequest(
+    `/api/billing/fake/checkout/${encodeURIComponent(sessionId)}/complete`,
+    BillingSubscriptionSchema,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export function cancelBillingSubscription(apiRequest: ApiRequest) {

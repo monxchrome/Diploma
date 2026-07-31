@@ -122,6 +122,7 @@ export default function configuration() {
       enabled: env.CSRF_ENABLED,
     },
     billing: {
+      allowFakeInProductionUnsafe: env.BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE,
       currency: env.BILLING_CURRENCY,
       enabled: env.BILLING_ENABLED,
       fakeProviderEnabled: env.BILLING_FAKE_PROVIDER_ENABLED,

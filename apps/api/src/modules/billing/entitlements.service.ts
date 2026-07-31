@@ -1,20 +1,16 @@
-import { Inject, Injectable, type OnModuleInit } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, type OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { PlanCode, SubscriptionStatus } from "../../generated/prisma/client";
+import { PlanCode, SubscriptionStatus, type PlanDefinition } from "../../generated/prisma/client";
+import { ErrorCodes } from "../../common/errors/error-codes";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import {
   ENTITLEMENT_KEYS,
-  PLAN_ENTITLEMENTS,
+  EntitlementsSchema,
+  PLAN_CATALOG,
   type EntitlementKey,
   type Entitlements,
 } from "./billing.types";
-
-const PLAN_COPY: Record<PlanCode, { description: string; name: string }> = {
-  FREE: { name: "Free", description: "A bounded local and evaluation plan." },
-  PRO: { name: "Pro", description: "For individual teams with expanded decision workflows." },
-  TEAM: { name: "Team", description: "For collaborative teams with higher shared limits." },
-};
 
 @Injectable()
 export class EntitlementsService implements OnModuleInit {
@@ -29,33 +25,49 @@ export class EntitlementsService implements OnModuleInit {
 
   async ensureCatalog(): Promise<void> {
     const version = this.catalogVersion();
-    await Promise.all(
-      (Object.keys(PLAN_ENTITLEMENTS) as PlanCode[]).map((code) =>
+    const currency = this.config.getOrThrow<string>("billing.currency");
+    await this.prisma.$transaction(
+      Object.values(PLAN_CATALOG).map((entry) =>
         this.prisma.planDefinition.upsert({
-          where: { code_version: { code, version } },
+          where: { code_version: { code: entry.code, version } },
           create: {
-            code,
+            active: true,
+            billingInterval: entry.billingInterval,
+            code: entry.code,
+            currency,
+            description: entry.description,
+            displayName: entry.displayName,
+            displayOrder: entry.displayOrder,
+            displayPrice: entry.displayPrice,
+            entitlements: entry.entitlements,
+            features: entry.features,
+            name: entry.displayName,
+            providerPriceKey: entry.providerPriceKey,
             version,
-            name: PLAN_COPY[code].name,
-            description: PLAN_COPY[code].description,
-            entitlements: PLAN_ENTITLEMENTS[code],
           },
           update: {
             active: true,
-            description: PLAN_COPY[code].description,
-            entitlements: PLAN_ENTITLEMENTS[code],
-            name: PLAN_COPY[code].name,
+            billingInterval: entry.billingInterval,
+            currency,
+            description: entry.description,
+            displayName: entry.displayName,
+            displayOrder: entry.displayOrder,
+            displayPrice: entry.displayPrice,
+            entitlements: entry.entitlements,
+            features: entry.features,
+            name: entry.displayName,
+            providerPriceKey: entry.providerPriceKey,
           },
         }),
       ),
     );
   }
 
-  async getPlans() {
+  async getPlans(): Promise<PlanDefinition[]> {
     await this.ensureCatalog();
     return this.prisma.planDefinition.findMany({
       where: { active: true, version: this.catalogVersion() },
-      orderBy: { code: "asc" },
+      orderBy: { displayOrder: "asc" },
     });
   }
 
@@ -66,24 +78,21 @@ export class EntitlementsService implements OnModuleInit {
     status: SubscriptionStatus;
   }> {
     const subscription = await this.ensureFreeSubscription(input.userId);
-    const eligiblePaidPlan =
-      subscription.planCode !== PlanCode.FREE &&
-      (subscription.status === SubscriptionStatus.ACTIVE ||
-        subscription.status === SubscriptionStatus.TRIALING) &&
-      (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > new Date());
-    const planCode = eligiblePaidPlan ? subscription.planCode : PlanCode.FREE;
-    const entitlements = { ...PLAN_ENTITLEMENTS[planCode] };
+    const definition = await this.effectivePlanDefinition(subscription);
+    const entitlements = EntitlementsSchema.parse(definition.entitlements);
     const overrides = await this.activeOverrides(input);
     for (const override of overrides) {
       if (!isEntitlementKey(override.entitlement)) continue;
-      const value = override.value;
-      if (typeof value === "number" || typeof value === "boolean")
-        entitlements[override.entitlement] = value;
+      const parsed = EntitlementsSchema.safeParse({
+        ...entitlements,
+        [override.entitlement]: override.value,
+      });
+      if (parsed.success) Object.assign(entitlements, parsed.data);
     }
     return {
       entitlements,
-      planCode,
-      planVersion: subscription.planVersion,
+      planCode: definition.code,
+      planVersion: definition.version,
       status: subscription.status,
     };
   }
@@ -92,11 +101,11 @@ export class EntitlementsService implements OnModuleInit {
     return this.prisma.subscription.upsert({
       where: { userId },
       create: {
-        userId,
         planCode: PlanCode.FREE,
         planVersion: this.catalogVersion(),
         provider: "FAKE",
         status: SubscriptionStatus.NONE,
+        userId,
       },
       update: {},
     });
@@ -104,6 +113,47 @@ export class EntitlementsService implements OnModuleInit {
 
   catalogVersion(): string {
     return this.config.getOrThrow<string>("billing.planCatalogVersion");
+  }
+
+  async latestActiveDefinition(planCode: PlanCode): Promise<PlanDefinition> {
+    await this.ensureCatalog();
+    const definition = await this.prisma.planDefinition.findFirst({
+      where: { active: true, code: planCode, version: this.catalogVersion() },
+    });
+    if (!definition) throw this.catalogUnavailable(planCode, this.catalogVersion());
+    return definition;
+  }
+
+  async definition(planCode: PlanCode, version: string): Promise<PlanDefinition> {
+    const definition = await this.prisma.planDefinition.findUnique({
+      where: { code_version: { code: planCode, version } },
+    });
+    if (!definition) throw this.catalogUnavailable(planCode, version);
+    return definition;
+  }
+
+  private async effectivePlanDefinition(subscription: {
+    currentPeriodEnd: Date | null;
+    planCode: PlanCode;
+    planVersion: string;
+    status: SubscriptionStatus;
+  }): Promise<PlanDefinition> {
+    if (subscription.planCode !== PlanCode.FREE && this.paidPlanIsEffective(subscription)) {
+      return this.definition(subscription.planCode, subscription.planVersion);
+    }
+    if (subscription.planCode === PlanCode.FREE) {
+      return this.definition(PlanCode.FREE, subscription.planVersion);
+    }
+    return this.latestActiveDefinition(PlanCode.FREE);
+  }
+
+  private paidPlanIsEffective(subscription: {
+    currentPeriodEnd: Date | null;
+    status: SubscriptionStatus;
+  }): boolean {
+    const periodIsActive =
+      !subscription.currentPeriodEnd || subscription.currentPeriodEnd > new Date();
+    return periodIsActive && PAID_EFFECTIVE_STATUSES.has(subscription.status);
   }
 
   private async activeOverrides(input: { projectId?: string; userId: string }) {
@@ -124,8 +174,22 @@ export class EntitlementsService implements OnModuleInit {
       orderBy: { createdAt: "asc" },
     });
   }
+
+  private catalogUnavailable(planCode: PlanCode, version: string): ConflictException {
+    return new ConflictException({
+      code: ErrorCodes.BillingUnavailable,
+      message: `Plan catalog entry ${planCode}/${version} is unavailable`,
+    });
+  }
 }
 
 function isEntitlementKey(value: string): value is EntitlementKey {
   return (ENTITLEMENT_KEYS as readonly string[]).includes(value);
 }
+
+const PAID_EFFECTIVE_STATUSES = new Set<SubscriptionStatus>([
+  SubscriptionStatus.TRIALING,
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.PAST_DUE,
+  SubscriptionStatus.CANCELLED,
+]);

@@ -45,14 +45,16 @@ export class ExperimentsService {
     userId: string;
   }) {
     this.requireEditor(input.role);
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
     await this.quota.assertFeature({
-      feature: "experimentAvailable",
+      feature: "experimentsAvailable",
       projectId: input.projectId,
-      userId: input.userId,
+      userId: billingOwnerUserId,
     });
     const experiment = await this.prisma.experiment.create({
       data: {
         projectId: input.projectId,
+        billingOwnerUserId,
         createdById: input.userId,
         name: input.body.name,
         description: input.body.description ?? null,
@@ -123,20 +125,17 @@ export class ExperimentsService {
     role: ProjectMemberRole;
   }) {
     this.requireEditor(input.role);
-    await this.requireExperiment(input.projectId, input.experimentId);
     const count = await this.prisma.experimentVariant.count({
       where: { experimentId: input.experimentId },
     });
-    const experiment = await this.requireExperiment(input.projectId, input.experimentId);
+    await this.requireExperiment(input.projectId, input.experimentId);
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
     await this.quota.assertCurrentResourceLimit({
       currentUsage: count,
       entitlement: "maximumExperimentVariants",
       projectId: input.projectId,
-      userId: experiment.createdById,
+      userId: billingOwnerUserId,
     });
-    if (count >= this.config.getOrThrow<number>("experiments.maximumVariants")) {
-      throw this.limit("Experiment variant limit reached");
-    }
     return this.prisma.experimentVariant.create({
       data: {
         experimentId: input.experimentId,
@@ -162,9 +161,13 @@ export class ExperimentsService {
     const caseIndex = await this.prisma.experimentCase.count({
       where: { experimentId: input.experimentId },
     });
-    if (caseIndex >= this.config.getOrThrow<number>("experiments.maximumCases")) {
-      throw this.limit("Experiment case limit reached");
-    }
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: caseIndex,
+      entitlement: "maximumExperimentCases",
+      projectId: input.projectId,
+      userId: billingOwnerUserId,
+    });
     return this.prisma.experimentCase.create({
       data: {
         experimentId: input.experimentId,
@@ -190,33 +193,36 @@ export class ExperimentsService {
   }) {
     this.requireEditor(input.role);
     const experiment = await this.get(input.projectId, input.experimentId);
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(input.projectId);
+    await this.quota.assertFeature({
+      feature: "experimentsAvailable",
+      projectId: input.projectId,
+      userId: billingOwnerUserId,
+    });
     if (!experiment.variants.length || !experiment.cases.length) {
       throw this.limit("At least one controlled variant and one case are required");
     }
     const repetitions = numericField(experiment.configuration, "repetitions", 1);
-    const maxRepetitions = this.config.getOrThrow<number>("experiments.maximumRepetitions");
-    if (repetitions > maxRepetitions) throw this.limit("Experiment repetition limit reached");
+    await this.quota.assertCurrentResourceLimit({
+      currentUsage: repetitions - 1,
+      entitlement: "maximumExperimentRepetitions",
+      projectId: input.projectId,
+      userId: billingOwnerUserId,
+    });
     const runCount = experiment.variants.length * experiment.cases.length * repetitions;
-    if (runCount > this.config.getOrThrow<number>("experiments.maximumRuns")) {
-      throw this.limit("Experiment run limit reached");
-    }
-    const estimatedCost = experiment.variants.reduce(
-      (total, variant) =>
-        total +
-        (variant.analysisMode === "MULTI_AGENT" ? 0.018 : 0.009) *
-          experiment.cases.length *
-          repetitions,
-      0,
-    );
-    if (estimatedCost > this.config.getOrThrow<number>("experiments.maximumEstimatedCost")) {
-      throw this.limit("Experiment estimated cost limit reached");
-    }
     await this.quota.reserve({
       metric: "monthlyExperimentRuns",
       projectId: input.projectId,
       quantity: runCount,
       resourceId: `experiment:${experiment.id}`,
-      userId: input.userId,
+      userId: billingOwnerUserId,
+    });
+    await this.quota.reserve({
+      metric: "maximumConcurrentExperimentRuns",
+      projectId: input.projectId,
+      quantity: 1,
+      resourceId: `experiment:${experiment.id}:concurrent`,
+      userId: billingOwnerUserId,
     });
     await this.prisma.$transaction(async (tx) => {
       for (const variant of experiment.variants) {
@@ -245,7 +251,11 @@ export class ExperimentsService {
       }
       await tx.experiment.update({
         where: { id: experiment.id },
-        data: { status: ExperimentStatus.QUEUED, cancellationRequested: false },
+        data: {
+          billingOwnerUserId,
+          status: ExperimentStatus.QUEUED,
+          cancellationRequested: false,
+        },
       });
     });
     await this.queue.add(
@@ -273,6 +283,7 @@ export class ExperimentsService {
       data: { cancellationRequested: true },
     });
     await this.quota.releaseResourceReservation(`experiment:${experimentId}`);
+    await this.quota.releaseResourceReservation(`experiment:${experimentId}:concurrent`);
     return { id: experimentId, cancellationRequested: true };
   }
 
@@ -338,10 +349,11 @@ export class ExperimentsService {
         resourceId: experiment.id,
         resourceType: "Experiment",
         unit: "run",
-        userId: experiment.createdById,
+        userId: experiment.billingOwnerUserId,
       },
       resourceId: `experiment:${experiment.id}`,
     });
+    await this.quota.releaseResourceReservation(`experiment:${experiment.id}:concurrent`);
   }
 
   async listRuns(projectId: string, experimentId: string) {
@@ -403,13 +415,45 @@ export class ExperimentsService {
     });
   }
 
-  async exportJson(projectId: string, experimentId: string, userId: string) {
-    await this.quota.assertFeature({ feature: "jsonCsvExportAvailable", projectId, userId });
-    return this.get(projectId, experimentId);
+  async exportJson(
+    projectId: string,
+    experimentId: string,
+    userId: string,
+    requestId: string = randomUUID(),
+  ) {
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(projectId);
+    await this.quota.assertFeature({
+      feature: "experimentJsonExportAvailable",
+      projectId,
+      userId: billingOwnerUserId,
+    });
+    const experiment = await this.get(projectId, experimentId);
+    await this.quota.recordUsage({
+      eventType: "experiment.export.json",
+      idempotencyKey: `usage:experiment:json:${experimentId}:${requestId}`,
+      metric: "exportJsonOperations",
+      projectId,
+      quantity: 1,
+      resourceId: experimentId,
+      resourceType: "Experiment",
+      unit: "export",
+      userId: billingOwnerUserId,
+    });
+    return experiment;
   }
 
-  async exportCsv(projectId: string, experimentId: string, userId: string): Promise<string> {
-    await this.quota.assertFeature({ feature: "jsonCsvExportAvailable", projectId, userId });
+  async exportCsv(
+    projectId: string,
+    experimentId: string,
+    userId: string,
+    requestId: string = randomUUID(),
+  ): Promise<string> {
+    const billingOwnerUserId = await this.quota.billingOwnerForProject(projectId);
+    await this.quota.assertFeature({
+      feature: "experimentCsvExportAvailable",
+      projectId,
+      userId: billingOwnerUserId,
+    });
     const runs = await this.listRuns(projectId, experimentId);
     const rows = ["run_id,case,variant,status,metric,value"];
     for (const run of runs) {
@@ -428,6 +472,17 @@ export class ExperimentsService {
         );
       }
     }
+    await this.quota.recordUsage({
+      eventType: "experiment.export.csv",
+      idempotencyKey: `usage:experiment:csv:${experimentId}:${requestId}`,
+      metric: "exportCsvOperations",
+      projectId,
+      quantity: 1,
+      resourceId: experimentId,
+      resourceType: "Experiment",
+      unit: "export",
+      userId: billingOwnerUserId,
+    });
     return rows.join("\n");
   }
 
@@ -465,6 +520,7 @@ export class ExperimentsService {
         data: { status: ExperimentStatus.CANCELLED, completedAt: new Date() },
       }),
     ]);
+    await this.quota.releaseResourceReservation(`experiment:${experimentId}:concurrent`);
   }
 
   private requireEditor(role: ProjectMemberRole): void {

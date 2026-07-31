@@ -16,8 +16,13 @@ describe("DeterministicFakeBillingProvider", () => {
           currentPeriodEnd: "2030-01-01T00:00:00.000Z",
           currentPeriodStart: "2029-12-01T00:00:00.000Z",
           customerId: "fake_customer_user",
-          metadata: { dip_user_id: "00000000-0000-4000-8000-000000000001" },
+          metadata: {
+            dip_plan_code: "PRO",
+            dip_plan_version: "phase-8-v1",
+            dip_user_id: "00000000-0000-4000-8000-000000000001",
+          },
           planCode: "PRO",
+          planVersion: "phase-8-v1",
           priceId: "fake_price_pro",
           providerSubscriptionId: "fake_subscription_1",
           status: "ACTIVE",
@@ -38,6 +43,54 @@ describe("DeterministicFakeBillingProvider", () => {
   it("rejects a forged webhook signature", () => {
     const provider = new DeterministicFakeBillingProvider("test-secret");
     expect(provider.verifyWebhook(Buffer.from("{}"), "v1=forged")).toBe(false);
+  });
+
+  it("keeps checkout redirect separate from controlled completion", async () => {
+    const provider = new DeterministicFakeBillingProvider("test-secret");
+    const checkout = await provider.createCheckoutSession({
+      cancelUrl: "http://localhost:3000/settings/billing",
+      email: "user@example.test",
+      idempotencyKey: "checkout-1",
+      metadata: {},
+      planCode: "PRO",
+      planVersion: "phase-8-v1",
+      successUrl: "http://localhost:3000/settings/billing",
+      trustedPriceId: "fake_price_pro",
+      userId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    expect((await provider.getSubscription("fake_subscription_checkout-1")) ?? null).toBeNull();
+    const event = provider.completeCheckout({
+      planCode: "PRO",
+      planVersion: "phase-8-v1",
+      sessionId: checkout.sessionId,
+      userId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    expect(event.subscription?.status).toBe("ACTIVE");
+    expect(event.subscription?.metadata.dip_plan_version).toBe("phase-8-v1");
+  });
+
+  it("returns the same checkout session for a repeated idempotency key", async () => {
+    const provider = new DeterministicFakeBillingProvider("test-secret");
+    const request = {
+      cancelUrl: "http://localhost:3000/settings/billing",
+      email: "user@example.test",
+      idempotencyKey: "retry-safe-checkout",
+      metadata: {},
+      planCode: "TEAM" as const,
+      planVersion: "phase-8-v1",
+      successUrl: "http://localhost:3000/settings/billing",
+      trustedPriceId: "fake_price_team",
+      userId: "00000000-0000-4000-8000-000000000001",
+    };
+
+    const [first, second] = await Promise.all([
+      provider.createCheckoutSession(request),
+      provider.createCheckoutSession(request),
+    ]);
+
+    expect(first.sessionId).toBe(second.sessionId);
   });
 });
 

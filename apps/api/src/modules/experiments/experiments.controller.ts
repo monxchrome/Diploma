@@ -189,8 +189,9 @@ export class ExperimentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("experimentId", ParseUUIDPipe) experimentId: string,
+    @Req() request: Request,
   ) {
-    return this.experiments.exportJson(projectId, experimentId, user.id);
+    return this.experiments.exportJson(projectId, experimentId, user.id, getRequestId(request));
   }
 
   @Get(":experimentId/export.csv")
@@ -199,7 +200,8 @@ export class ExperimentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("experimentId", ParseUUIDPipe) experimentId: string,
+    @Req() request: Request,
   ) {
-    return this.experiments.exportCsv(projectId, experimentId, user.id);
+    return this.experiments.exportCsv(projectId, experimentId, user.id, getRequestId(request));
   }
 }

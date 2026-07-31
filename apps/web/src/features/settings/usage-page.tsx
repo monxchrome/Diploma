@@ -6,13 +6,14 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { AppShell } from "@/features/shell/app-shell";
 import { fetchBillingUsage } from "@/features/projects/projects-api";
 
-const labels: Record<string, string> = {
-  maximumStorageBytes: "Storage",
-  monthlyAnalysisRuns: "Analysis runs",
-  monthlyExperimentRuns: "Experiment runs",
-  monthlyExternalResearchQueries: "Research queries",
-  monthlyFetchedExternalPages: "Fetched pages",
-};
+const metrics = [
+  ["maximumStorageBytes", "Storage"],
+  ["monthlyAnalysisRuns", "Analysis runs"],
+  ["monthlyExperimentRuns", "Experiment runs"],
+  ["monthlyExternalResearchQueries", "Research queries"],
+  ["monthlyFetchedExternalPages", "Fetched pages"],
+  ["monthlyExternalBytes", "Fetched bytes"],
+] as const;
 
 export function UsagePage() {
   const { apiRequest, status } = useAuth();
@@ -35,13 +36,13 @@ export function UsagePage() {
           ) : null}
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Object.entries(labels).map(([metric, label]) => {
+          {metrics.map(([metric, label]) => {
             const used =
               usage.data?.metrics
                 .filter((item) => item.metric === metric)
                 .reduce((sum, item) => sum + item.quantity, 0) ?? 0;
             const limit = usage.data?.limits[metric];
-            const numericLimit = typeof limit === "number" ? limit : 0;
+            const numericLimit = limit ?? 0;
             const percent = numericLimit
               ? Math.min((used / numericLimit) * 100, 100)
               : used

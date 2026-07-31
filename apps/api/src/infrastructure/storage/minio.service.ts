@@ -24,6 +24,14 @@ export class MinioService {
     return { contentLength: Number(response.headers.get("content-length") ?? -1) };
   }
 
+  async removeObject(key: string): Promise<void> {
+    const url = this.objectUrl(key);
+    const headers = this.signHeaders("DELETE", url, "UNSIGNED-PAYLOAD");
+    const response = await fetch(url, { headers, method: "DELETE" });
+    if (response.status === 404 || response.ok) return;
+    throw new ServiceUnavailableException("Object storage is unavailable");
+  }
+
   createUploadUrl(
     key: string,
     contentType: string,

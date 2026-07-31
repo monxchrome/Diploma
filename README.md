@@ -325,7 +325,7 @@ Migrations are a separate controlled step (`scripts/production/migrate.sh`). The
 
 Production configuration validates URL origins, trusted proxy configuration, secure cookie settings, database/Redis/MinIO/Qdrant/internal-service configuration, and provider settings before the app accepts traffic. API secrets may come from environment variables or `*_FILE` Docker secret paths and are never returned or logged.
 
-Billing offers server-owned FREE, PRO, and TEAM catalog entries. The local fake provider is deterministic and needs no Stripe key. Stripe uses trusted configured price IDs, signed webhooks, idempotent event storage, and webhook-driven subscription state; a checkout redirect never grants access. Billing routes are:
+Phase 8 billing offers server-owned, versioned FREE, PRO, and TEAM catalog entries. The local fake provider is deterministic and needs no Stripe key. Stripe uses trusted configured price IDs, signed webhooks, idempotent event storage, and webhook-driven subscription state; a checkout redirect never grants access. Billing routes are:
 
 ```text
 GET  /api/billing/plans
@@ -339,6 +339,12 @@ POST /api/billing/resume
 POST /api/webhooks/stripe
 ```
 
-Usage uses an immutable, idempotent ledger with reservations for expensive work. Quota rejection returns `QUOTA_EXCEEDED` with the constrained resource, current usage, limit, reset time, and available upgrade options. Users can view safe subscription and usage details at `/settings/billing` and `/settings/usage`.
+For local fake billing, retain `BILLING_PROVIDER=fake` and `BILLING_FAKE_PROVIDER_ENABLED=true`. Fake checkout is completed only through the authenticated, non-production controlled endpoint; the redirect itself has no billing effect. Production rejects `BILLING_PROVIDER=fake` unless `BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE=true` is explicitly set, which is intentionally not a supported deployment mode.
+
+For Stripe test mode, configure the server-only `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, and `STRIPE_TEAM_PRICE_ID` in an ignored environment file, set `BILLING_PROVIDER=stripe`, then forward signed webhooks to `/api/webhooks/stripe`. No real IDs or secrets are committed. `BILLING_PLAN_CATALOG_VERSION` must change when a plan definition changes.
+
+Usage uses an immutable, idempotent ledger with account-scoped reservations for expensive work. Quota rejection returns `QUOTA_EXCEEDED` with the constrained resource, current usage, limit, reset time, and available upgrade options. Users can view safe subscription and usage details at `/settings/billing` and `/settings/usage`. See [billing overview](docs/billing/overview.md) and [billing troubleshooting](docs/billing/troubleshooting.md).
+
+Billing limitations: Stripe is the only production adapter; TEAM is not seat-based billing; there are no usage overage charges, coupons, manual discounts, internal invoices, tax engine, PayPal, crypto, App Store, or Google Play billing. Estimated model cost is telemetry, not an invoice source of truth. Downgrades preserve data, and over-limit users can still read and delete existing resources.
 
 Run `scripts/production/backup.sh .env.production` for timestamped PostgreSQL, MinIO, and Qdrant backup artifacts. Restore is deliberately manual and requires `CONFIRM_RESTORE=yes`; see `docs/deployment/backups-and-restore.md`. The reference deployment is single-region, has no Kubernetes or multi-region failover, cannot automatically roll back a database migration, supports Stripe as the only production payment adapter, and treats estimated AI costs as telemetry rather than invoice truth.

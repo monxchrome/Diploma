@@ -75,10 +75,11 @@ services:
       AUTH_COOKIE_DOMAIN: ${COOKIE_DOMAIN}
       AUTH_COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
       AUTH_COOKIE_SECURE: "true"
+      BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE: "false"
       BILLING_ENABLED: ${BILLING_ENABLED:-true}
-      BILLING_FAKE_WEBHOOK_SECRET_FILE: /run/secrets/billing_fake_webhook_secret
-      BILLING_PROVIDER: ${BILLING_PROVIDER:-fake}
-      BILLING_PLAN_CATALOG_VERSION: ${BILLING_PLAN_CATALOG_VERSION:-phase-7-v1}
+      BILLING_FAKE_PROVIDER_ENABLED: "false"
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-stripe}
+      BILLING_PLAN_CATALOG_VERSION: ${BILLING_PLAN_CATALOG_VERSION:-phase-8-v1}
       BULLMQ_CONNECTION_URL: redis://redis:6379/1
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       CSRF_ENABLED: ${CSRF_ENABLED:-true}
@@ -113,7 +114,6 @@ services:
       TRUSTED_PROXY_COUNT: "1"
     secrets:
       - ingestion_internal_secret
-      - billing_fake_webhook_secret
       - jwt_access_secret
       - minio_access_key
       - minio_secret_key
@@ -157,8 +157,11 @@ services:
       APP_WORKER_ONLY: "true"
       AUTH_COOKIE_DOMAIN: ${COOKIE_DOMAIN}
       AUTH_COOKIE_SECURE: "true"
-      BILLING_PROVIDER: ${BILLING_PROVIDER:-fake}
-      BILLING_FAKE_WEBHOOK_SECRET_FILE: /run/secrets/billing_fake_webhook_secret
+      BILLING_ALLOW_FAKE_IN_PRODUCTION_UNSAFE: "false"
+      BILLING_ENABLED: ${BILLING_ENABLED:-true}
+      BILLING_FAKE_PROVIDER_ENABLED: "false"
+      BILLING_PLAN_CATALOG_VERSION: ${BILLING_PLAN_CATALOG_VERSION:-phase-8-v1}
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-stripe}
       BULLMQ_CONNECTION_URL: redis://redis:6379/1
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
@@ -175,11 +178,15 @@ services:
       RESEARCH_API_KEY_FILE: /run/secrets/research_api_key
       RESEARCH_PROVIDER: ${RESEARCH_PROVIDER:-fake}
       STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+      STRIPE_PORTAL_RETURN_URL: ${STRIPE_PORTAL_RETURN_URL:-}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
+      STRIPE_TEAM_PRICE_ID: ${STRIPE_TEAM_PRICE_ID:-}
       STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
       TRUSTED_PROXY_COUNT: "1"
     secrets:
       - ingestion_internal_secret
-      - billing_fake_webhook_secret
       - jwt_access_secret
       - minio_access_key
       - minio_secret_key
@@ -332,7 +339,6 @@ networks:
   dip-internal: { driver: bridge, internal: true }
 
 secrets:
-  billing_fake_webhook_secret: { external: true }
   ingestion_internal_secret: { external: true }
   jwt_access_secret: { external: true }
   minio_access_key: { external: true }
