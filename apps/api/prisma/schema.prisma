@@ -549,6 +549,11 @@ model ResearchRun {
   resultCount              Int                @default(0)
   fetchedPageCount         Int                @default(0)
   selectedSourceCount      Int                @default(0)
+  selectedForFetchCount    Int                @default(0)
+  extractedCount           Int                @default(0)
+  acceptedEvidenceCount    Int                @default(0)
+  securityRejectedCount    Int                @default(0)
+  policyRejectedCount      Int                @default(0)
   totalFetchedBytes        Int                @default(0)
   totalExtractedCharacters Int                @default(0)
   totalDurationMs          Int?

@@ -94,6 +94,10 @@ async def test_prompt_injection_source_is_rejected_before_receiving_trusted_evid
     ).execute(request)
     assert response.status in {"COMPLETED", "COMPLETED_WITH_LIMITATIONS"}
     assert [item.evidence_id for item in response.external_evidence] == ["W1", "W2"]
+    assert len(response.sources) == 3
+    assert len(response.snapshots) == 3
+    assert sum(item.accepted_as_evidence for item in response.sources) == 2
+    assert sum(item.pipeline_status == "SECURITY_REJECTED" for item in response.sources) == 1
     rejected = next(item for item in response.sources if item.prompt_injection_detected)
     assert rejected.pipeline_status == "SECURITY_REJECTED"
     assert rejected.accepted_as_evidence is False

@@ -310,6 +310,9 @@ class AnalysisReport(BaseModel):
     citation_validity_score: float = Field(default=0.0, alias="citationValidityScore", ge=0, le=1)
     supported_claim_ratio: float = Field(default=0.0, alias="supportedClaimRatio", ge=0, le=1)
     unsupported_claim_count: int = Field(default=0, alias="unsupportedClaimCount", ge=0)
+    unsupported_claim_details: list[str] = Field(
+        default_factory=list, alias="unsupportedClaimDetails", max_length=100
+    )
     evidence_coverage: float = Field(default=0.0, alias="evidenceCoverage", ge=0, le=1)
     evidence_sufficiency_score: float = Field(
         default=0.0, alias="evidenceSufficiencyScore", ge=0, le=1

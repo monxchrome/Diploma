@@ -95,7 +95,6 @@ services:
   ollama:
     image: ollama/ollama:0.11.0
     container_name: dip-ollama
-    profiles: ["ai-heavy"]
     restart: unless-stopped
     # Let Ollama offload model layers to the host NVIDIA GPU. CPU remains
     # available for the API, worker, retrieval, and orchestration work.

@@ -2517,6 +2517,14 @@ def citation_validator(state: AnalysisGraphState) -> dict[str, object]:
         else check
         for check in report.quality_gate_checks
     ]
+    unsupported_details = list(
+        dict.fromkeys(
+            [
+                *_unsupported_claim_reasons(report),
+                *_citation_specificity_reasons(report, evidence),
+            ]
+        )
+    )
     reviewed = report.model_copy(
         update={
             "grounding_score": grounding,
@@ -2525,6 +2533,7 @@ def citation_validator(state: AnalysisGraphState) -> dict[str, object]:
             "citation_validity_score": citation_validity,
             "supported_claim_ratio": supported_ratio,
             "unsupported_claim_count": unsupported,
+            "unsupported_claim_details": unsupported_details,
             "evidence_coverage": coverage,
             "quality_gate_passed": report.quality_gate_passed
             and grounding >= settings.analysis_min_grounding_score,

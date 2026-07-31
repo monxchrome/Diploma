@@ -24,6 +24,7 @@ type AnalysisResearchInput = {
     publishedBefore: Date | null;
     researchCountry: string | null;
     researchLanguages: Prisma.JsonValue;
+    assumptions: Prisma.JsonValue;
     sourceTypes: Prisma.JsonValue;
   };
   analysisRunId: string;
@@ -380,6 +381,17 @@ export class ResearchService {
           (snapshot) => snapshot.fetchStatus === "FETCHED",
         ).length,
         selectedSourceCount: response.externalEvidence.length,
+        selectedForFetchCount: response.sources.length,
+        extractedCount: response.snapshots.filter(
+          (snapshot) => snapshot.extractedCharacterCount > 0,
+        ).length,
+        acceptedEvidenceCount: response.externalEvidence.length,
+        securityRejectedCount: response.sources.filter(
+          (source) => source.pipelineStatus === "SECURITY_REJECTED",
+        ).length,
+        policyRejectedCount: response.sources.filter(
+          (source) => source.rejectionReason && source.rejectionReason !== "PROMPT_INJECTION_DETECTED",
+        ).length,
         totalFetchedBytes: response.totalFetchedBytes,
         totalExtractedCharacters: response.totalExtractedCharacters,
         totalDurationMs: response.totalDurationMs,
@@ -394,19 +406,22 @@ export class ResearchService {
     const conflicts = response.externalEvidence.filter((item) =>
       item.extractedText.toLowerCase().includes("conflict"),
     );
-    if (internalEvidence.length && conflicts.length) {
-      await this.prisma.evidenceConflict.deleteMany({
-        where: {
-          analysisRunId: (
-            await this.prisma.researchRun.findUniqueOrThrow({ where: { id: researchRunId } })
-          ).analysisRunId,
-        },
-      });
+    const currentRun = await this.prisma.researchRun.findUniqueOrThrow({
+      where: { id: researchRunId },
+      include: { analysisRun: { include: { analysis: true } } },
+    });
+    await this.prisma.evidenceConflict.deleteMany({
+      where: { analysisRunId: currentRun.analysisRunId },
+    });
+    const assumptions = stringList(currentRun.analysisRun.analysis.assumptions)
+      .join(" ")
+      .toLowerCase();
+    const demandAlreadyValidated =
+      assumptions.includes("already validated") || assumptions.includes("demand is validated");
+    if (internalEvidence.length && conflicts.length && demandAlreadyValidated) {
       await this.prisma.evidenceConflict.create({
         data: {
-          analysisRunId: (
-            await this.prisma.researchRun.findUniqueOrThrow({ where: { id: researchRunId } })
-          ).analysisRunId,
+          analysisRunId: currentRun.analysisRunId,
           topic: "External evidence conflicts with an internal assumption",
           internalEvidenceIds: internalEvidence.slice(0, 3).map((item) => item.evidenceId),
           externalEvidenceIds: conflicts.map((item) => item.evidenceId),

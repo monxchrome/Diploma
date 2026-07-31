@@ -372,7 +372,13 @@ function Research({
         </span>
       </div>
       <InfoRow label="Search queries" value={formatCount(record.queryCount)} />
-      <InfoRow label="Selected sources" value={formatCount(record.selectedSourceCount)} />
+      <InfoRow label="Search results" value={formatCount(record.resultCount)} />
+      <InfoRow label="Selected for fetch" value={formatCount(record.selectedForFetchCount)} />
+      <InfoRow label="Fetched sources" value={formatCount(record.fetchedPageCount)} />
+      <InfoRow label="Extracted sources" value={formatCount(record.extractedCount)} />
+      <InfoRow label="Accepted evidence sources" value={formatCount(record.acceptedEvidenceCount)} />
+      <InfoRow label="Security-rejected sources" value={formatCount(record.securityRejectedCount)} />
+      <InfoRow label="Policy-rejected sources" value={formatCount(record.policyRejectedCount)} />
       {getString(record, "failureMessage") ? (
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
           {getString(record, "failureMessage")}
@@ -572,6 +578,24 @@ function Report({
     analysis.evidenceMode !== "EXTERNAL_ONLY" && analysis.knowledgeBaseIds.length === 0;
   const internalCitations = run.report?.citations ?? [];
   const externalCitations = run.report?.externalCitations ?? [];
+  const renderedText = [
+    getString(report, "executiveSummary"),
+    getString(report, "recommendation"),
+    ...sections.map((section) => getString(asRecord(section), "content")),
+    ...(Array.isArray(report.riskRegister)
+      ? report.riskRegister.flatMap((risk) => {
+          const item = asRecord(risk);
+          return [getString(item, "risk"), getString(item, "mitigation")];
+        })
+      : []),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ");
+  const citedInternalEvidence = internalCitations.filter((citation) => {
+    const item = asRecord(citation);
+    const evidenceId = getString(item, "evidenceId");
+    return evidenceId ? renderedText.includes(`[${evidenceId}]`) : false;
+  });
   return (
     <section className="grid gap-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
       {limited ? (
@@ -679,12 +703,39 @@ function Report({
           <span className="font-semibold text-amber-700">Completed with limitations</span>
         ) : null}
       </div>
+      {Array.isArray(report.unsupportedClaimDetails) && report.unsupportedClaimDetails.length ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <p className="font-semibold">Unsupported claim details</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {report.unsupportedClaimDetails.map((detail, index) => (
+              <li key={index}>{String(detail)}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="grid gap-3 border-t border-slate-100 pt-4 text-sm">
         <h4 className="font-semibold text-slate-950">Evidence provenance</h4>
         <p className="text-slate-600">
-          Internal project evidence: {internalCitations.length}. External web evidence:{" "}
+          Selected internal evidence: {internalCitations.length}. Cited internal evidence:{" "}
+          {citedInternalEvidence.length}. Unused internal evidence:{" "}
+          {internalCitations.length - citedInternalEvidence.length}. Accepted external evidence:{" "}
           {externalCitations.length}.
         </p>
+        {internalCitations.length ? (
+          <ul className="grid gap-2 text-slate-700">
+            {internalCitations.map((citation, index) => {
+              const item = asRecord(citation);
+              return (
+                <li className="rounded border border-slate-200 p-3" key={index}>
+                  <span className="font-medium">
+                    {getString(item, "evidenceId") ?? "Internal evidence"}
+                  </span>
+                  {getString(item, "quote") ? `: ${getString(item, "quote")}` : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
         {externalCitations.length ? (
           <ul className="grid gap-2 text-slate-700">
             {externalCitations.map((citation, index) => {

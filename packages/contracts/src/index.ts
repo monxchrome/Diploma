@@ -868,6 +868,7 @@ export const AnalysisReportSchema = z.object({
   citationValidityScore: z.number().min(0).max(1).default(0),
   supportedClaimRatio: z.number().min(0).max(1).default(0),
   unsupportedClaimCount: z.number().int().nonnegative().default(0),
+  unsupportedClaimDetails: z.array(z.string().max(2_000)).max(100).default([]),
   evidenceCoverage: z.number().min(0).max(1).default(0),
   evidenceSufficiencyScore: z.number().min(0).max(1).default(0),
   decisionReadinessScore: z.number().min(0).max(1).default(0),
