@@ -13,6 +13,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import type { AuthenticatedUser } from "../../common/auth/authenticated-request";
@@ -28,6 +29,7 @@ import type { ProjectAccess } from "./project-request";
 import { ProjectsService } from "./projects.service";
 
 @Controller("projects")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 @UseGuards(JwtAuthGuard)
 export class ProjectsController {
   constructor(@Inject(ProjectsService) private readonly projectsService: ProjectsService) {}

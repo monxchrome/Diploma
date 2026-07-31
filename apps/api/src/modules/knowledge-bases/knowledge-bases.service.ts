@@ -56,6 +56,14 @@ export class KnowledgeBasesService {
   async get(projectId: string, id: string) {
     return knowledgeBaseDto(await this.requireKnowledgeBase(projectId, id));
   }
+  async listDocuments(projectId: string, knowledgeBaseId: string) {
+    await this.requireKnowledgeBase(projectId, knowledgeBaseId);
+    const documents = await this.prisma.document.findMany({
+      where: { knowledgeBaseId, archivedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
+    return documents.map(documentDto);
+  }
   async create(input: {
     projectId: string;
     userId: string;
@@ -281,6 +289,22 @@ export class KnowledgeBasesService {
     if (!document)
       throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Document not found" });
     return documentDto(document);
+  }
+  async archiveDocument(input: {
+    projectId: string;
+    knowledgeBaseId: string;
+    documentId: string;
+    role: ProjectMemberRole;
+  }) {
+    this.requireEditor(input.role);
+    const document = await this.prisma.document.findFirst({
+      where: { id: input.documentId, knowledgeBaseId: input.knowledgeBaseId, knowledgeBase: { projectId: input.projectId } },
+    });
+    if (!document) throw new NotFoundException({ code: ErrorCodes.NotFound, message: "Document not found" });
+    return documentDto(await this.prisma.document.update({
+      where: { id: document.id },
+      data: { archivedAt: new Date(), status: DocumentStatus.ARCHIVED },
+    }));
   }
   private async requireKnowledgeBase(projectId: string, id: string) {
     const value = await this.prisma.knowledgeBase.findFirst({ where: { id, projectId } });

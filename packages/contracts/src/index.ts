@@ -370,6 +370,27 @@ export const AnswerFeedbackRequestSchema = z.object({
 export type AnswerFeedbackRequest = z.infer<typeof AnswerFeedbackRequestSchema>;
 
 export const AnalysisModeSchema = z.enum(["SINGLE_AGENT", "MULTI_AGENT"]);
+export const EvidenceModeSchema = z.enum(["INTERNAL_ONLY", "EXTERNAL_ONLY", "HYBRID"]);
+export const ResearchRunStatusSchema = z.enum([
+  "QUEUED",
+  "PLANNING",
+  "SEARCHING",
+  "FETCHING",
+  "EXTRACTING",
+  "COMPLETED",
+  "COMPLETED_WITH_LIMITATIONS",
+  "FAILED",
+  "CANCELLED",
+]);
+export const ExperimentStatusSchema = z.enum([
+  "DRAFT",
+  "QUEUED",
+  "RUNNING",
+  "COMPLETED",
+  "COMPLETED_WITH_LIMITATIONS",
+  "FAILED",
+  "CANCELLED",
+]);
 export const SpecialistTypeSchema = z.enum([
   "MARKET",
   "FINANCIAL",
@@ -388,31 +409,350 @@ export const AnalysisStatusSchema = z.enum([
   "ARCHIVED",
 ]);
 export type AnalysisMode = z.infer<typeof AnalysisModeSchema>;
+export type EvidenceMode = z.infer<typeof EvidenceModeSchema>;
+export type ResearchRunStatus = z.infer<typeof ResearchRunStatusSchema>;
+export type ExperimentStatus = z.infer<typeof ExperimentStatusSchema>;
 export type SpecialistType = z.infer<typeof SpecialistTypeSchema>;
 export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
 
 const BoundedTextListSchema = z.array(z.string().trim().min(1).max(1_000)).max(20).default([]);
+const CountryCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z]{2}$/)
+  .optional();
+const DomainListSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/),
+  )
+  .max(30)
+  .default([]);
+const DateFilterSchema = z.string().datetime().optional();
 
-export const CreateAnalysisRequestSchema = z.object({
+export const CreateAnalysisRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    decisionQuestion: z.string().trim().min(1).max(4_000),
+    objectives: BoundedTextListSchema,
+    constraints: BoundedTextListSchema,
+    assumptions: BoundedTextListSchema,
+    timeHorizon: z.string().trim().max(200).optional(),
+    targetMarket: z.string().trim().max(200).optional(),
+    currency: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+    knowledgeBaseIds: z.array(z.string().uuid()).max(50).default([]),
+    documentIds: z.array(z.string().uuid()).max(100).default([]),
+    mode: AnalysisModeSchema.default("MULTI_AGENT"),
+    requestedSpecialists: z.array(SpecialistTypeSchema).max(5).default([]),
+    additionalContext: z.string().trim().max(4_000).optional(),
+    evidenceMode: EvidenceModeSchema.default("INTERNAL_ONLY"),
+    externalResearchEnabled: z.boolean().default(false),
+    researchCountry: CountryCodeSchema,
+    researchLanguages: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^[a-z]{2,3}(?:-[A-Z]{2})?$/),
+      )
+      .max(10)
+      .default([]),
+    publishedAfter: DateFilterSchema,
+    publishedBefore: DateFilterSchema,
+    preferredDomains: DomainListSchema,
+    excludedDomains: DomainListSchema,
+    sourceTypes: z
+      .array(
+        z.enum([
+          "GOVERNMENT",
+          "REGULATOR",
+          "OFFICIAL_DOCUMENTATION",
+          "PRIMARY_RESEARCH",
+          "ORGANIZATION_REPORT",
+          "PROFESSIONAL_PUBLICATION",
+          "NEWS",
+          "OTHER",
+        ]),
+      )
+      .max(8)
+      .default([]),
+    maximumExternalSources: z.number().int().min(1).max(20).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.evidenceMode !== "EXTERNAL_ONLY" && value.knowledgeBaseIds.length === 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Knowledge bases are required unless evidenceMode is EXTERNAL_ONLY",
+        path: ["knowledgeBaseIds"],
+      });
+    }
+    if (value.evidenceMode === "INTERNAL_ONLY" && value.externalResearchEnabled) {
+      context.addIssue({
+        code: "custom",
+        message: "externalResearchEnabled requires EXTERNAL_ONLY or HYBRID evidence",
+        path: ["externalResearchEnabled"],
+      });
+    }
+    if (value.evidenceMode !== "INTERNAL_ONLY" && !value.externalResearchEnabled) {
+      context.addIssue({
+        code: "custom",
+        message: "External evidence modes require explicit externalResearchEnabled",
+        path: ["externalResearchEnabled"],
+      });
+    }
+    if (
+      value.publishedAfter &&
+      value.publishedBefore &&
+      value.publishedAfter > value.publishedBefore
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "publishedAfter must not be after publishedBefore",
+        path: ["publishedAfter"],
+      });
+    }
+  });
+export type CreateAnalysisRequest = z.infer<typeof CreateAnalysisRequestSchema>;
+
+export const ResearchPolicySchema = z.object({
+  enabled: z.boolean(),
+  policyVersion: z.string().min(1),
+  provider: z.string().min(1),
+  maximumQueries: z.number().int().positive(),
+  maximumResultsPerQuery: z.number().int().positive(),
+  maximumFetchedPages: z.number().int().positive(),
+  maximumPageBytes: z.number().int().positive(),
+  maximumTotalBytes: z.number().int().positive(),
+  maximumContextTokens: z.number().int().positive(),
+  totalTimeoutSeconds: z.number().positive(),
+  allowedSchemes: z.array(z.enum(["http", "https"])),
+  allowedContentTypes: z.array(z.string()),
+  blockPrivateNetworks: z.boolean(),
+  domainAllowlist: z.array(z.string()),
+  domainDenylist: z.array(z.string()),
+  failureMode: z.enum(["LIMITATION", "FAIL_CLOSED"]),
+});
+export type ResearchPolicy = z.infer<typeof ResearchPolicySchema>;
+
+export const ResearchPlanSchema = z.object({
+  researchRequired: z.boolean(),
+  researchObjective: z.string().max(1_000),
+  evidenceGaps: z.array(z.string().max(1_000)).max(10),
+  searchQueries: z.array(z.string().min(1).max(300)).max(5),
+  expectedSourceTypes: z.array(z.string()).max(8),
+  preferredDomains: z.array(z.string()).max(30),
+  freshnessRequirement: z.string().max(200),
+  country: z.string().nullable(),
+  languages: z.array(z.string()).max(10),
+  stopConditions: z.array(z.string().max(300)).max(10),
+  rationaleSummary: z.string().max(1_000),
+});
+export type ResearchPlan = z.infer<typeof ResearchPlanSchema>;
+
+export const ExternalEvidenceSchema = z.object({
+  evidenceId: z.string().regex(/^W[1-9]\d*$/),
+  researchSourceId: z.string().uuid(),
+  researchSnapshotId: z.string().uuid(),
+  title: z.string(),
+  publisher: z.string().nullable(),
+  url: z.string().url(),
+  sourceType: z.string().nullable(),
+  publishedAt: z.string().datetime().nullable(),
+  retrievedAt: z.string().datetime(),
+  extractedText: z.string().max(20_000),
+  selectedExcerpt: z.string().min(1).max(4_000),
+  relevanceScore: z.number().min(0).max(1).nullable(),
+  credibilityAssessment: z.record(z.string(), z.unknown()),
+  freshnessStatus: z.string(),
+  queryIds: z.array(z.string().uuid()),
+  contentHash: z.string().length(64),
+  warnings: z.array(z.string()),
+});
+export type ExternalEvidence = z.infer<typeof ExternalEvidenceSchema>;
+
+export const ResearchExecutionResponseSchema = z.object({
+  status: ResearchRunStatusSchema,
+  plan: ResearchPlanSchema,
+  queries: z.array(
+    z.object({
+      id: z.string().uuid(),
+      queryIndex: z.number().int().nonnegative(),
+      query: z.string(),
+      purpose: z.string(),
+      country: z.string().nullable(),
+      languages: z.array(z.string()),
+      publishedAfter: z.string().datetime().nullable(),
+      publishedBefore: z.string().datetime().nullable(),
+      status: z.enum(["COMPLETED", "FAILED", "CANCELLED"]),
+      resultCount: z.number().int().nonnegative(),
+      durationMs: z.number().int().nullable(),
+      errorCode: z.string().nullable(),
+      results: z.array(
+        z.object({
+          title: z.string(),
+          url: z.string().url(),
+          displayedUrl: z.string(),
+          snippet: z.string(),
+          providerRank: z.number().int().positive(),
+          publishedAt: z.string().datetime().nullable(),
+          sourceType: z.string().nullable(),
+          language: z.string().nullable(),
+          providerMetadata: z.record(z.string(), z.unknown()),
+        }),
+      ),
+    }),
+  ),
+  sources: z.array(
+    z.object({
+      id: z.string().uuid(),
+      normalizedUrl: z.string().url(),
+      domain: z.string(),
+      canonicalUrl: z.string().url().nullable(),
+      title: z.string(),
+      publisher: z.string().nullable(),
+      author: z.string().nullable(),
+      sourceType: z.string().nullable(),
+      language: z.string().nullable(),
+      pipelineStatus: z.enum([
+        "SEARCH_RESULT_SELECTED_FOR_FETCH",
+        "FETCHED",
+        "EXTRACTED",
+        "SECURITY_REJECTED",
+        "ACCEPTED_AS_EVIDENCE",
+      ]),
+      promptInjectionDetected: z.boolean(),
+      acceptedAsEvidence: z.boolean(),
+      rejectionReason: z.string().nullable(),
+      embeddedCitationIdsIgnored: z.boolean(),
+      followedEmbeddedUrls: z.number().int().nonnegative(),
+      exposedSecrets: z.boolean(),
+    }),
+  ),
+  snapshots: z.array(
+    z.object({
+      id: z.string().uuid(),
+      researchSourceId: z.string().uuid(),
+      contentHash: z.string().length(64),
+      fetchStatus: z.enum(["FETCHED", "REJECTED", "FAILED"]),
+      httpStatus: z.number().int().nullable(),
+      contentType: z.string().nullable(),
+      publishedAt: z.string().datetime().nullable(),
+      retrievedAt: z.string().datetime(),
+      extractedTitle: z.string().nullable(),
+      extractedText: z.string().max(20_000),
+      extractedMetadata: z.record(z.string(), z.unknown()),
+      credibilityAssessment: z.record(z.string(), z.unknown()),
+      extractionVersion: z.string(),
+      fetchDurationMs: z.number().int().nullable(),
+      extractedCharacterCount: z.number().int().nonnegative(),
+      warnings: z.array(z.string()),
+      errorCode: z.string().nullable(),
+      errorMessage: z.string().nullable(),
+    }),
+  ),
+  externalEvidence: z.array(ExternalEvidenceSchema),
+  totalFetchedBytes: z.number().int().nonnegative(),
+  totalExtractedCharacters: z.number().int().nonnegative(),
+  totalDurationMs: z.number().int().nonnegative(),
+  searchDurationMs: z.number().int().nonnegative(),
+  fetchDurationMs: z.number().int().nonnegative(),
+  extractionDurationMs: z.number().int().nonnegative(),
+  warnings: z.array(z.string()),
+  failureCode: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+});
+export type ResearchExecutionResponse = z.infer<typeof ResearchExecutionResponseSchema>;
+
+export const ResearchSourceSchema = z.object({
+  id: z.string().uuid(),
+  normalizedUrl: z.string().url(),
+  domain: z.string(),
+  title: z.string(),
+  publisher: z.string().nullable(),
+  sourceType: z.string().nullable(),
+  snapshots: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        extractedTitle: z.string().nullable(),
+        extractedText: z.string().max(20_000),
+        retrievedAt: z.string().datetime(),
+        credibilityAssessment: z.record(z.string(), z.unknown()),
+        warnings: z.array(z.string()).catch([]),
+        fetchStatus: z.string(),
+      }),
+    )
+    .catch([]),
+});
+
+export const CalculatorRequestSchema = z.object({
+  operation: z.enum([
+    "add",
+    "subtract",
+    "multiply",
+    "divide",
+    "percentage",
+    "weighted_average",
+    "break_even",
+  ]),
+  inputs: z
+    .array(
+      z.object({
+        value: z.number().finite(),
+        unit: z.string().trim().max(32),
+        source: z.string().trim().max(200),
+      }),
+    )
+    .min(1)
+    .max(10),
+  rounding: z.number().int().min(0).max(8).default(2),
+});
+export type CalculatorRequest = z.infer<typeof CalculatorRequestSchema>;
+
+export const HumanEvaluationScoresSchema = z.object({
+  factualCorrectness: z.number().int().min(1).max(5),
+  evidenceGrounding: z.number().int().min(1).max(5),
+  citationUsefulness: z.number().int().min(1).max(5),
+  completeness: z.number().int().min(1).max(5),
+  decisionUsefulness: z.number().int().min(1).max(5),
+  riskAwareness: z.number().int().min(1).max(5),
+  uncertaintyDisclosure: z.number().int().min(1).max(5),
+  clarity: z.number().int().min(1).max(5),
+  conciseness: z.number().int().min(1).max(5),
+  overallPreference: z.number().int().min(1).max(5),
+});
+
+export const ExperimentVariantRequestSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  analysisMode: AnalysisModeSchema,
+  evidenceMode: z.enum(["INTERNAL_ONLY", "HYBRID"]),
+  retrievalConfiguration: z.object({ rerankerEnabled: z.boolean().optional() }).default({}),
+  criticConfiguration: z.object({ enabled: z.boolean().optional() }).default({}),
+});
+export const ExperimentCaseRequestSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  decisionQuestion: z.string().trim().min(1).max(4_000),
+  question: z.string().trim().min(1).max(4_000),
   objectives: BoundedTextListSchema,
   constraints: BoundedTextListSchema,
   assumptions: BoundedTextListSchema,
-  timeHorizon: z.string().trim().max(200).optional(),
-  targetMarket: z.string().trim().max(200).optional(),
-  currency: z
-    .string()
-    .trim()
-    .regex(/^[A-Z]{3}$/)
-    .optional(),
-  knowledgeBaseIds: z.array(z.string().uuid()).min(1).max(50),
-  documentIds: z.array(z.string().uuid()).max(100).default([]),
-  mode: AnalysisModeSchema.default("MULTI_AGENT"),
-  requestedSpecialists: z.array(SpecialistTypeSchema).max(5).default([]),
-  additionalContext: z.string().trim().max(4_000).optional(),
+  scope: z.record(z.string(), z.unknown()).default({}),
+  expectedEvidence: z.array(z.string()).max(50).default([]),
+  rubric: z.record(z.string(), z.unknown()).default({}),
 });
-export type CreateAnalysisRequest = z.infer<typeof CreateAnalysisRequestSchema>;
+export const CreateExperimentRequestSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(2_000).optional(),
+  datasetId: z.string().trim().min(1).max(120).default("phase-6-synthetic-v1"),
+  repetitions: z.number().int().min(1).max(5).default(1),
+});
+export type CreateExperimentRequest = z.infer<typeof CreateExperimentRequestSchema>;
 
 export const AnalysisPlanSchema = z.object({
   decisionType: z.string().min(1).max(100),
@@ -471,6 +811,34 @@ export const RiskItemSchema = z.object({
 });
 export type RiskItem = z.infer<typeof RiskItemSchema>;
 
+export const ExternalContextItemSchema = z.object({
+  claim: z.string().min(1).max(4_000),
+  citations: z.array(CitationSchema).max(20).default([]),
+});
+export type ExternalContextItem = z.infer<typeof ExternalContextItemSchema>;
+
+export const EvidenceConflictItemSchema = z.object({
+  topic: z.string().min(1).max(2_000),
+  internalPosition: z.string().min(1).max(4_000),
+  externalPosition: z.string().min(1).max(4_000),
+  provenance: z.array(z.string().max(2_000)).max(20).default([]),
+  credibilityWarnings: z.array(z.string().max(2_000)).max(20).default([]),
+  freshnessWarnings: z.array(z.string().max(2_000)).max(20).default([]),
+  unresolved: z.boolean(),
+  effectOnConfidence: z.string().min(1).max(2_000),
+  citations: z.array(CitationSchema).max(20).default([]),
+});
+export type EvidenceConflictItem = z.infer<typeof EvidenceConflictItemSchema>;
+
+export const QualityGateCheckSchema = z.object({
+  check: z.string().min(1).max(200),
+  passed: z.boolean(),
+  actual: z.number().min(0).max(1).nullable().optional(),
+  threshold: z.number().min(0).max(1).nullable().optional(),
+  detail: z.string().min(1).max(2_000),
+});
+export type QualityGateCheck = z.infer<typeof QualityGateCheckSchema>;
+
 export const AnalysisReportSchema = z.object({
   executiveSummary: z.string().max(12_000),
   recommendedOption: z.string().max(4_000),
@@ -495,7 +863,22 @@ export const AnalysisReportSchema = z.object({
   limitations: z.array(z.string().max(2_000)).max(20).default([]),
   qualityGatePassed: z.boolean(),
   qualityScore: z.number().min(0).max(1),
+  reportQualityScore: z.number().min(0).max(1).default(0),
   groundingScore: z.number().min(0).max(1),
+  citationValidityScore: z.number().min(0).max(1).default(0),
+  supportedClaimRatio: z.number().min(0).max(1).default(0),
+  unsupportedClaimCount: z.number().int().nonnegative().default(0),
+  evidenceCoverage: z.number().min(0).max(1).default(0),
+  evidenceSufficiencyScore: z.number().min(0).max(1).default(0),
+  decisionReadinessScore: z.number().min(0).max(1).default(0),
+  decisionReadiness: z.enum(["LOW", "MEDIUM", "HIGH"]).default("LOW"),
+  decisionReady: z.boolean().default(false),
+  readinessChecks: z.array(QualityGateCheckSchema).max(20).default([]),
+  factsConfidence: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
+  decisionConfidence: z.enum(["LOW", "MEDIUM", "HIGH"]).default("LOW"),
+  externalContext: z.array(ExternalContextItemSchema).max(20).default([]),
+  evidenceConflicts: z.array(EvidenceConflictItemSchema).max(20).default([]),
+  qualityGateChecks: z.array(QualityGateCheckSchema).max(20).default([]),
 });
 export type AnalysisReport = z.infer<typeof AnalysisReportSchema>;
 

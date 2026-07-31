@@ -19,6 +19,14 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
 
+  logger.log({
+    event: "external_research_policy",
+    externalResearchEnabled: configService.getOrThrow<boolean>("research.enabled"),
+    provider: configService.getOrThrow<string>("research.provider"),
+    policyVersion: configService.getOrThrow<string>("research.policyVersion"),
+    projectPolicyState: "not_configured",
+  });
+
   app.useLogger(logger);
   app.enableShutdownHooks();
   app.setGlobalPrefix("api");

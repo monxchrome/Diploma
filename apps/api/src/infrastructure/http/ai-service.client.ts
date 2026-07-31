@@ -144,6 +144,53 @@ export class AiServiceClient {
     }
   }
 
+  async executeResearch(payload: unknown, requestId: string): Promise<unknown> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<unknown>("/v1/internal/research/execute", payload, {
+          headers: {
+            [REQUEST_ID_HEADER]: requestId,
+            "x-internal-service-secret": this.config.getOrThrow<string>(
+              "aiService.ingestionSecret",
+            ),
+          },
+          timeout: this.config.getOrThrow<number>("research.jobTimeoutMs"),
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
+  async cancelResearch(researchRunId: string, requestId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.httpService.post(
+          "/v1/internal/research/cancel",
+          { researchRunId },
+          {
+            headers: {
+              [REQUEST_ID_HEADER]: requestId,
+              "x-internal-service-secret": this.config.getOrThrow<string>(
+                "aiService.ingestionSecret",
+              ),
+            },
+            timeout: this.config.getOrThrow<number>("research.jobTimeoutMs"),
+          },
+        ),
+      );
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
   async deactivateDocumentVersion(documentVersionId: string, requestId: string): Promise<void> {
     try {
       await firstValueFrom(

@@ -6,7 +6,7 @@ import { ConfigService } from "@nestjs/config";
 import { HealthService } from "./health.service";
 
 @Controller("health")
-@SkipThrottle()
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true, default: true })
 export class HealthController {
   constructor(
     @Inject(ConfigService) private readonly configService: ConfigService,

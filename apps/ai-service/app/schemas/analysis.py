@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.contracts import AiCitation, RetrievalEvidence
 
 AnalysisMode = Literal["SINGLE_AGENT", "MULTI_AGENT"]
+EvidenceMode = Literal["INTERNAL_ONLY", "EXTERNAL_ONLY", "HYBRID"]
 SpecialistType = Literal["MARKET", "FINANCIAL", "LEGAL_REGULATORY", "RISK", "STRATEGY"]
 
 
@@ -17,6 +18,8 @@ class AnalysisInput(BaseModel):
     request_id: str = Field(alias="requestId")
     graph_version: str = Field(alias="graphVersion")
     mode: AnalysisMode
+    evidence_mode: EvidenceMode = Field(default="INTERNAL_ONLY", alias="evidenceMode")
+    external_research_enabled: bool = Field(default=False, alias="externalResearchEnabled")
     title: str = Field(min_length=1, max_length=200)
     question: str = Field(alias="decisionQuestion", min_length=1, max_length=4000)
     objectives: list[str] = Field(default_factory=list, max_length=20)
@@ -26,7 +29,7 @@ class AnalysisInput(BaseModel):
     target_market: str | None = Field(default=None, alias="targetMarket")
     currency: str | None = None
     authorized_knowledge_base_ids: list[str] = Field(
-        alias="authorizedKnowledgeBaseIds", min_length=1
+        default_factory=list, alias="authorizedKnowledgeBaseIds"
     )
     authorized_document_ids: list[str] = Field(default_factory=list, alias="authorizedDocumentIds")
     requested_specialists: list[SpecialistType] = Field(
@@ -34,6 +37,7 @@ class AnalysisInput(BaseModel):
     )
     additional_context: str | None = Field(default=None, alias="additionalContext", max_length=4000)
     initial_retrieval_run_id: str = Field(alias="initialRetrievalRunId")
+    cache_key: str = Field(default="", alias="cacheKey", max_length=128)
     initial_evidence: list[RetrievalEvidence] = Field(default_factory=list, alias="initialEvidence")
 
     model_config = ConfigDict(populate_by_name=True)
@@ -164,6 +168,35 @@ class ReportSection(BaseModel):
     content: str
 
 
+class ExternalContextItem(BaseModel):
+    claim: str = Field(min_length=1)
+    citations: list[AiCitation] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EvidenceConflictItem(BaseModel):
+    topic: str = Field(min_length=1)
+    internal_position: str = Field(alias="internalPosition", min_length=1)
+    external_position: str = Field(alias="externalPosition", min_length=1)
+    provenance: list[str] = Field(default_factory=list)
+    credibility_warnings: list[str] = Field(default_factory=list, alias="credibilityWarnings")
+    freshness_warnings: list[str] = Field(default_factory=list, alias="freshnessWarnings")
+    unresolved: bool
+    effect_on_confidence: str = Field(alias="effectOnConfidence", min_length=1)
+    citations: list[AiCitation] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class QualityGateCheck(BaseModel):
+    check: str = Field(min_length=1)
+    passed: bool
+    actual: float | None = None
+    threshold: float | None = None
+    detail: str = Field(min_length=1)
+
+
 class RiskModelItem(BaseModel):
     risk: str
     category: str
@@ -202,7 +235,7 @@ class RiskItem(BaseModel):
     )
     residual_risk: Literal["LOW", "MEDIUM", "HIGH"] = Field(alias="residualRisk")
     uncertainty: str = Field(min_length=1)
-    citations: list[AiCitation] = Field(min_length=1)
+    citations: list[AiCitation] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -272,16 +305,52 @@ class AnalysisReport(BaseModel):
     limitations: list[str] = Field(default_factory=list)
     quality_gate_passed: bool = Field(alias="qualityGatePassed")
     quality_score: float = Field(alias="qualityScore", ge=0, le=1)
+    report_quality_score: float = Field(default=0.0, alias="reportQualityScore", ge=0, le=1)
     grounding_score: float = Field(alias="groundingScore", ge=0, le=1)
+    citation_validity_score: float = Field(default=0.0, alias="citationValidityScore", ge=0, le=1)
+    supported_claim_ratio: float = Field(default=0.0, alias="supportedClaimRatio", ge=0, le=1)
+    unsupported_claim_count: int = Field(default=0, alias="unsupportedClaimCount", ge=0)
+    evidence_coverage: float = Field(default=0.0, alias="evidenceCoverage", ge=0, le=1)
+    evidence_sufficiency_score: float = Field(
+        default=0.0, alias="evidenceSufficiencyScore", ge=0, le=1
+    )
+    decision_readiness_score: float = Field(default=0.0, alias="decisionReadinessScore", ge=0, le=1)
+    decision_readiness: Literal["LOW", "MEDIUM", "HIGH"] = Field(
+        default="LOW", alias="decisionReadiness"
+    )
+    decision_ready: bool = Field(default=False, alias="decisionReady")
+    readiness_checks: list[QualityGateCheck] = Field(default_factory=list, alias="readinessChecks")
+    facts_confidence: Literal["LOW", "MEDIUM", "HIGH"] = Field(
+        default="MEDIUM", alias="factsConfidence"
+    )
+    decision_confidence: Literal["LOW", "MEDIUM", "HIGH"] = Field(
+        default="LOW", alias="decisionConfidence"
+    )
+    external_context: list[ExternalContextItem] = Field(
+        default_factory=list, alias="externalContext"
+    )
+    evidence_conflicts: list[EvidenceConflictItem] = Field(
+        default_factory=list, alias="evidenceConflicts"
+    )
+    quality_gate_checks: list[QualityGateCheck] = Field(
+        default_factory=list, alias="qualityGateChecks"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class CriticOutput(BaseModel):
     approved: bool
+    report_passed: bool = Field(default=True, alias="reportPassed")
+    decision_ready: bool = Field(default=True, alias="decisionReady")
     reasons: list[str] = Field(default_factory=list)
     quality_score: float = Field(alias="qualityScore", ge=0, le=1)
     grounding_score: float = Field(alias="groundingScore", ge=0, le=1)
+    evidence_sufficiency_score: float = Field(
+        default=1.0, alias="evidenceSufficiencyScore", ge=0, le=1
+    )
+    decision_readiness_score: float = Field(default=1.0, alias="decisionReadinessScore", ge=0, le=1)
+    readiness_reasons: list[str] = Field(default_factory=list, alias="readinessReasons")
 
     model_config = ConfigDict(populate_by_name=True)
 

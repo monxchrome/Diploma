@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { InjectQueue } from "@nestjs/bullmq";
 import { HttpException, HttpStatus, Inject, Injectable, NotFoundException } from "@nestjs/common";
@@ -24,8 +24,36 @@ import {
 } from "../../generated/prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { canUpdateProject } from "../projects/project-permissions";
+import { ResearchService } from "../research/research.service";
 
 const ACTIVE = [AnalysisStatus.QUEUED, AnalysisStatus.RUNNING];
+
+function jsonStringArray(value: Prisma.JsonValue): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function analysisScopeKey(input: {
+  analysisRunId: string;
+  assumptions: string[];
+  knowledgeBaseIds: string[];
+  documentIds: string[];
+  evidenceMode: string;
+  researchRunId: string;
+  graphVersion: string;
+}): string {
+  const canonical = JSON.stringify({
+    analysisRunId: input.analysisRunId,
+    assumptions: [...input.assumptions].sort(),
+    knowledgeBaseIds: [...input.knowledgeBaseIds].sort(),
+    documentIds: [...input.documentIds].sort(),
+    evidenceMode: input.evidenceMode,
+    researchRunId: input.researchRunId,
+    graphVersion: input.graphVersion,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
 
 @Injectable()
 export class AnalysesService {
@@ -35,6 +63,7 @@ export class AnalysesService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(ConfigService) private readonly config: ConfigService,
     @InjectQueue("analysis") private readonly queue: Queue,
+    @Inject(ResearchService) private readonly research: ResearchService,
   ) {}
 
   async create(input: {
@@ -61,6 +90,16 @@ export class AnalysesService {
         knowledgeBaseIds: input.body.knowledgeBaseIds,
         documentIds: input.body.documentIds,
         mode: input.body.mode,
+        evidenceMode: input.body.evidenceMode,
+        externalResearchEnabled: input.body.externalResearchEnabled,
+        researchCountry: input.body.researchCountry ?? null,
+        researchLanguages: input.body.researchLanguages,
+        publishedAfter: input.body.publishedAfter ? new Date(input.body.publishedAfter) : null,
+        publishedBefore: input.body.publishedBefore ? new Date(input.body.publishedBefore) : null,
+        preferredDomains: input.body.preferredDomains,
+        excludedDomains: input.body.excludedDomains,
+        sourceTypes: input.body.sourceTypes,
+        maximumExternalSources: input.body.maximumExternalSources ?? null,
         requestedSpecialists: input.body.requestedSpecialists,
         additionalContext: input.body.additionalContext ?? null,
       },
@@ -90,7 +129,10 @@ export class AnalysesService {
       include: {
         runs: {
           orderBy: { createdAt: "desc" },
-          include: { agentRuns: true, report: { include: { citations: true } } },
+          include: {
+            agentRuns: true,
+            report: { include: { citations: true, externalCitations: true } },
+          },
         },
       },
     });
@@ -116,7 +158,22 @@ export class AnalysesService {
       where: { analysisId: analysis.id, status: { in: ACTIVE } },
       orderBy: { createdAt: "desc" },
     });
-    if (active) return active;
+    if (active) {
+      const queueState = active.bullJobId
+        ? await this.queue.getJobState(active.bullJobId)
+        : "unknown";
+      if (!["completed", "failed", "unknown"].includes(queueState)) return active;
+      await this.prisma.analysisRun.update({
+        where: { id: active.id },
+        data: {
+          status: AnalysisStatus.FAILED,
+          currentStage: "FAILED",
+          errorCode: "ANALYSIS_WORKER_UNAVAILABLE",
+          errorMessage: "The analysis worker stopped before completing the run.",
+          completedAt: new Date(),
+        },
+      });
+    }
     await this.enforceLimits(input.projectId, input.userId);
     const id = randomUUID();
     const run = await this.prisma.analysisRun.create({
@@ -145,7 +202,12 @@ export class AnalysesService {
     return this.prisma.analysisRun.update({ where: { id: run.id }, data: { bullJobId: run.id } });
   }
 
-  async cancel(input: { analysisId: string; projectId: string; role: ProjectMemberRole }) {
+  async cancel(input: {
+    analysisId: string;
+    projectId: string;
+    role: ProjectMemberRole;
+    requestId: string;
+  }) {
     this.requireEditor(input.role);
     const run = await this.prisma.analysisRun.findFirst({
       where: { analysisId: input.analysisId, projectId: input.projectId, status: { in: ACTIVE } },
@@ -160,6 +222,7 @@ export class AnalysesService {
       where: { id: run.id },
       data: { cancellationRequested: true },
     });
+    await this.research.cancelForAnalysisRun(run.id, input.requestId);
     if (run.status === AnalysisStatus.QUEUED) {
       await this.prisma.analysisRun.update({
         where: { id: run.id },
@@ -191,40 +254,83 @@ export class AnalysesService {
         status: AnalysisStatus.RUNNING,
         currentStage: "initial_retrieval",
         progress: 10,
+        errorCode: null,
+        errorMessage: null,
+        completedAt: null,
         startedAt: new Date(),
       },
     });
     try {
-      const retrieval = await this.ai.retrieve({
-        projectId: run.projectId,
-        query: run.analysis.decisionQuestion,
-        requestId,
-        mode: "HYBRID",
-        topK: this.config.getOrThrow<number>("analysis.maxEvidencePerSpecialist"),
-        generateAnswer: false,
-        filters: {
-          knowledgeBaseIds: run.analysis.knowledgeBaseIds,
-          documentIds: run.analysis.documentIds,
-        },
-      });
-      const raw = SearchResponseSchema.parse({
-        ...(retrieval as object),
-        retrievalRunId: randomUUID(),
-      });
-      const retrievalRun = await this.prisma.retrievalRun.create({
-        data: {
+      let internalEvidence: z.infer<typeof SearchResponseSchema>["evidence"] = [];
+      let retrievalRunId: string = randomUUID();
+      const objectives = jsonStringArray(run.analysis.objectives);
+      const constraints = jsonStringArray(run.analysis.constraints);
+      const assumptions = jsonStringArray(run.analysis.assumptions);
+      const knowledgeBaseIds = jsonStringArray(run.analysis.knowledgeBaseIds);
+      const documentIds = jsonStringArray(run.analysis.documentIds);
+      const retrievalParts: unknown[] = [
+        run.analysis.decisionQuestion,
+        run.analysis.title,
+        run.analysis.targetMarket,
+        ...objectives,
+        ...constraints,
+        ...assumptions,
+        typeof run.analysis.additionalContext === "string"
+          ? run.analysis.additionalContext
+          : "",
+      ];
+      const retrievalQuery = retrievalParts
+        .filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+        .join(" ")
+        .slice(0, 4_000);
+      if (run.analysis.evidenceMode !== "EXTERNAL_ONLY") {
+        const retrieval = await this.ai.retrieve({
           projectId: run.projectId,
-          userId: run.userId,
-          query: run.analysis.decisionQuestion,
-          normalizedQuery: raw.normalizedQuery,
+          query: retrievalQuery,
+          requestId,
           mode: "HYBRID",
+          topK: this.config.getOrThrow<number>("analysis.maxEvidencePerSpecialist"),
+          generateAnswer: false,
           filters: {
-            knowledgeBaseIds: run.analysis.knowledgeBaseIds,
-            documentIds: run.analysis.documentIds,
+            knowledgeBaseIds,
+            documentIds,
           },
-          timingsMs: raw.timingsMs,
-          resultCount: raw.evidence.length,
-        },
+        });
+        const raw = SearchResponseSchema.parse({
+          ...(retrieval as object),
+          retrievalRunId: randomUUID(),
+        });
+        internalEvidence = raw.evidence;
+        const retrievalRun = await this.prisma.retrievalRun.create({
+          data: {
+            projectId: run.projectId,
+            userId: run.userId,
+            query: retrievalQuery,
+            normalizedQuery: raw.normalizedQuery,
+            mode: "HYBRID",
+            filters: {
+              knowledgeBaseIds,
+              documentIds,
+            },
+            timingsMs: raw.timingsMs,
+            resultCount: raw.evidence.length,
+          },
+        });
+        retrievalRunId = retrievalRun.id;
+      }
+      const externalEvidence = run.analysis.externalResearchEnabled
+        ? await this.research.executeForAnalysis({
+            analysis: run.analysis,
+            analysisRunId: run.id,
+            internalEvidence,
+            projectId: run.projectId,
+            requestId,
+          })
+        : [];
+      const evidence = [...internalEvidence, ...externalEvidence];
+      const researchRun = await this.prisma.researchRun.findUnique({
+        where: { analysisRunId: run.id },
+        select: { id: true },
       });
       const response = await this.ai.analyze(
         {
@@ -236,20 +342,31 @@ export class AnalysesService {
           requestId,
           graphVersion: run.graphVersion,
           mode: run.analysis.mode,
+          evidenceMode: run.analysis.evidenceMode,
+          externalResearchEnabled: run.analysis.externalResearchEnabled,
           title: run.analysis.title,
           decisionQuestion: run.analysis.decisionQuestion,
-          objectives: run.analysis.objectives,
-          constraints: run.analysis.constraints,
-          assumptions: run.analysis.assumptions,
+          objectives,
+          constraints,
+          assumptions,
           timeHorizon: run.analysis.timeHorizon,
           targetMarket: run.analysis.targetMarket,
           currency: run.analysis.currency,
-          authorizedKnowledgeBaseIds: run.analysis.knowledgeBaseIds,
-          authorizedDocumentIds: run.analysis.documentIds,
+          authorizedKnowledgeBaseIds: knowledgeBaseIds,
+          authorizedDocumentIds: documentIds,
           requestedSpecialists: run.analysis.requestedSpecialists,
           additionalContext: run.analysis.additionalContext,
-          initialRetrievalRunId: retrievalRun.id,
-          initialEvidence: raw.evidence,
+          initialRetrievalRunId: retrievalRunId,
+          cacheKey: analysisScopeKey({
+            analysisRunId: run.id,
+            assumptions,
+            knowledgeBaseIds,
+            documentIds,
+            evidenceMode: run.analysis.evidenceMode,
+            researchRunId: researchRun?.id ?? "none",
+            graphVersion: run.graphVersion,
+          }),
+          initialEvidence: evidence,
         },
         requestId,
       );
@@ -258,13 +375,26 @@ export class AnalysesService {
       const minimumGroundingScore = this.config.get<number>("analysis.minGroundingScore", 0.7);
       const completedWithLimitations =
         result.report.insufficientEvidence ||
+        !result.report.decisionReady ||
         !result.report.qualityGatePassed ||
         result.report.qualityScore < minimumQualityScore ||
         result.report.groundingScore < minimumGroundingScore;
       const current = await this.prisma.analysisRun.findUniqueOrThrow({ where: { id: run.id } });
       if (current.cancellationRequested) return this.cancelRun(run.id);
-      const evidenceById = new Map(raw.evidence.map((item) => [item.evidenceId, item]));
-      const citations = result.report.citations.map((citation) => {
+      const evidenceById = new Map(evidence.map((item) => [item.evidenceId, item]));
+      const internalCitations: Array<
+        Pick<
+          Prisma.AnalysisCitationCreateManyInput,
+          "evidenceId" | "documentId" | "chunkId" | "quote"
+        >
+      > = [];
+      const externalCitations: Array<
+        Pick<
+          Prisma.ExternalAnalysisCitationCreateManyInput,
+          "evidenceId" | "researchRunId" | "researchSnapshotId" | "quote"
+        >
+      > = [];
+      for (const citation of result.report.citations) {
         const evidence = evidenceById.get(citation.evidenceId);
         if (
           !evidence ||
@@ -272,13 +402,22 @@ export class AnalysesService {
           !evidence.snippet.includes(citation.quote)
         )
           throw new Error("Analysis citation was not validated");
-        return {
-          evidenceId: citation.evidenceId,
-          documentId: citation.documentId,
-          chunkId: evidence.chunkId,
-          quote: citation.quote,
-        };
-      });
+        if (citation.evidenceId.startsWith("W")) {
+          externalCitations.push({
+            evidenceId: citation.evidenceId,
+            researchRunId: evidence.knowledgeBaseId,
+            researchSnapshotId: evidence.chunkId,
+            quote: citation.quote,
+          });
+        } else {
+          internalCitations.push({
+            evidenceId: citation.evidenceId,
+            documentId: citation.documentId,
+            chunkId: evidence.chunkId,
+            quote: citation.quote,
+          });
+        }
+      }
       await this.prisma.$transaction(async (tx) => {
         await tx.analysisRun.update({
           where: { id: run.id },
@@ -289,7 +428,8 @@ export class AnalysesService {
             currentStage: result.currentStage,
             progress: 100,
             plan: result.plan ?? Prisma.JsonNull,
-            initialRetrievalRunId: retrievalRun.id,
+            initialRetrievalRunId:
+              run.analysis.evidenceMode === "EXTERNAL_ONLY" ? null : retrievalRunId,
             completedAt: new Date(),
           },
         });
@@ -328,9 +468,21 @@ export class AnalysesService {
           update: { report: result.report },
         });
         await tx.analysisCitation.deleteMany({ where: { analysisReportId: report.id } });
-        if (citations.length)
+        if (internalCitations.length)
           await tx.analysisCitation.createMany({
-            data: citations.map((citation) => ({ analysisReportId: report.id, ...citation })),
+            data: internalCitations.map((citation) => ({
+              analysisReportId: report.id,
+              ...citation,
+            })),
+            skipDuplicates: true,
+          });
+        await tx.externalAnalysisCitation.deleteMany({ where: { analysisReportId: report.id } });
+        if (externalCitations.length)
+          await tx.externalAnalysisCitation.createMany({
+            data: externalCitations.map((citation) => ({
+              analysisReportId: report.id,
+              ...citation,
+            })),
             skipDuplicates: true,
           });
         for (const nodeName of result.checkpoints)

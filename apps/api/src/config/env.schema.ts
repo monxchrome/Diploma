@@ -35,7 +35,7 @@ export const ApiEnvSchema = z
   .object({
     AI_SERVICE_URL: HttpUrlSchema.default("http://localhost:8000"),
     ANALYSIS_CHECKPOINT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
-    ANALYSIS_GRAPH_VERSION: z.string().min(1).max(100).default("phase-5-v2"),
+    ANALYSIS_GRAPH_VERSION: z.string().min(1).max(100).default("phase-6-v1"),
     ANALYSIS_JOB_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
     ANALYSIS_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(660_000),
     ANALYSIS_MAX_CONCURRENT_PER_PROJECT: z.coerce.number().int().positive().default(2),
@@ -53,6 +53,46 @@ export const ApiEnvSchema = z
     ANALYSIS_QUEUE_CONCURRENCY: z.coerce.number().int().positive().default(2),
     ANALYSIS_QUEUE_NAME: z.string().min(1).default("analysis"),
     ANALYSIS_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+    EXTERNAL_RESEARCH_ENABLED: BooleanStringSchema,
+    EXTERNAL_RESEARCH_DEFAULT_MODE: z
+      .enum(["INTERNAL_ONLY", "EXTERNAL_ONLY", "HYBRID"])
+      .default("INTERNAL_ONLY"),
+    RESEARCH_PROVIDER: z.enum(["fake", "brave"]).default("fake"),
+    RESEARCH_API_KEY: z.string().max(1_000).default(""),
+    RESEARCH_MAX_QUERIES: z.coerce.number().int().min(1).max(5).default(3),
+    RESEARCH_RESULTS_PER_QUERY: z.coerce.number().int().min(1).max(20).default(5),
+    RESEARCH_MAX_FETCHED_PAGES: z.coerce.number().int().min(1).max(20).default(5),
+    RESEARCH_MAX_PAGE_BYTES: z.coerce.number().int().min(1_024).max(5_000_000).default(500_000),
+    RESEARCH_MAX_TOTAL_BYTES: z.coerce.number().int().min(1_024).max(20_000_000).default(2_000_000),
+    RESEARCH_MAX_REDIRECTS: z.coerce.number().int().min(0).max(10).default(3),
+    RESEARCH_FETCH_TIMEOUT_SECONDS: z.coerce.number().positive().max(60).default(10),
+    RESEARCH_TOTAL_TIMEOUT_SECONDS: z.coerce.number().positive().max(300).default(60),
+    RESEARCH_MAX_CONTEXT_TOKENS: z.coerce.number().int().min(256).max(100_000).default(4_000),
+    RESEARCH_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
+    RESEARCH_POLICY_VERSION: z.string().min(1).max(100).default("phase-6-v1"),
+    RESEARCH_ALLOWED_SCHEMES: z.string().default("http,https"),
+    RESEARCH_ALLOWED_CONTENT_TYPES: z
+      .string()
+      .default("text/html,text/plain,application/xhtml+xml"),
+    RESEARCH_BLOCK_PRIVATE_NETWORKS: TrueBooleanStringSchema,
+    RESEARCH_DOMAIN_ALLOWLIST: z.string().default(""),
+    RESEARCH_DOMAIN_DENYLIST: z.string().default(""),
+    RESEARCH_QUEUE_NAME: z.string().min(1).default("external-research"),
+    RESEARCH_QUEUE_CONCURRENCY: z.coerce.number().int().positive().max(20).default(2),
+    RESEARCH_JOB_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
+    RESEARCH_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+    EXPERIMENT_QUEUE_NAME: z.string().min(1).default("experiments"),
+    EXPERIMENT_QUEUE_CONCURRENCY: z.coerce.number().int().positive().max(20).default(1),
+    EXPERIMENT_MAX_VARIANTS: z.coerce.number().int().min(1).max(8).default(4),
+    EXPERIMENT_MAX_CASES: z.coerce.number().int().min(1).max(50).default(10),
+    EXPERIMENT_MAX_REPETITIONS: z.coerce.number().int().min(1).max(5).default(3),
+    EXPERIMENT_MAX_RUNS: z.coerce.number().int().min(1).max(200).default(100),
+    EXPERIMENT_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+    EXPERIMENT_MAX_ESTIMATED_COST: z.coerce.number().nonnegative().default(25),
+    EVALUATION_RUBRIC_VERSION: z.string().min(1).max(100).default("phase-6-v1"),
+    EVALUATION_LLM_JUDGE_ENABLED: BooleanStringSchema,
+    EVALUATION_LLM_JUDGE_PROVIDER: z.string().min(1).max(100).default("disabled"),
+    EVALUATION_LLM_JUDGE_MODEL: z.string().min(1).max(200).default("disabled"),
     AUTH_COOKIE_DOMAIN: z.string().optional(),
     AUTH_COOKIE_NAME: z.string().min(1).default("dip_refresh"),
     AUTH_COOKIE_SAME_SITE: SameSiteSchema.default("lax"),
@@ -130,6 +170,18 @@ export const ApiEnvSchema = z
         code: "custom",
         message: "REFRESH_TOKEN_PEPPER must be replaced in production",
         path: ["REFRESH_TOKEN_PEPPER"],
+      });
+    }
+
+    if (
+      env.EXTERNAL_RESEARCH_ENABLED &&
+      env.RESEARCH_PROVIDER === "brave" &&
+      !env.RESEARCH_API_KEY
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "RESEARCH_API_KEY is required when the Brave provider is enabled",
+        path: ["RESEARCH_API_KEY"],
       });
     }
   });

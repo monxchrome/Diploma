@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.analyses import router as analyses_router
 from app.api.routes.health import router as health_router
 from app.api.routes.ingestions import router as ingestions_router
+from app.api.routes.research import router as research_router
 from app.api.routes.retrieval import router as retrieval_router
 from app.api.routes.system import router as system_router
 from app.core.config import get_settings
@@ -26,6 +27,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level, settings.service_name, settings.environment)
     logger = get_logger()
+    logger.info(
+        "external_research_policy",
+        external_research_enabled=settings.external_research_enabled,
+        provider=settings.research_provider,
+        policy_version=settings.research_policy_version,
+        project_policy_state="not_configured",
+    )
 
     middleware = [
         Middleware(
@@ -53,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(analyses_router)
     app.include_router(ingestions_router)
     app.include_router(retrieval_router)
+    app.include_router(research_router)
     app.include_router(system_router)
     return app
 

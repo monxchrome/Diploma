@@ -1,5 +1,6 @@
 import type { SafeUser } from "@dip/contracts";
 import { Body, Controller, Get, Inject, Patch, UseGuards } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../../common/auth/authenticated-request";
@@ -8,6 +9,7 @@ import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { UsersService } from "./users.service";
 
 @Controller("users")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(@Inject(UsersService) private readonly usersService: UsersService) {}

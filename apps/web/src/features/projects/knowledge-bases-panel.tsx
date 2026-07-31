@@ -11,6 +11,8 @@ import {
   createKnowledgeBase,
   createUploadIntent,
   fetchKnowledgeBases,
+  fetchDocuments,
+  deleteDocument,
 } from "./projects-api";
 
 export function KnowledgeBasesPanel({
@@ -27,12 +29,28 @@ export function KnowledgeBasesPanel({
     queryFn: () => fetchKnowledgeBases(apiRequest, projectId),
     queryKey: ["knowledge-bases", projectId],
   });
+  const documents = useQuery({
+    enabled: status === "authenticated" && Boolean(knowledgeBases.data?.length),
+    queryFn: async () => {
+      const bases = knowledgeBases.data ?? [];
+      const lists = await Promise.all(
+        bases.map((base) => fetchDocuments(apiRequest, projectId, base.id)),
+      );
+      return lists.flat();
+    },
+    queryKey: ["knowledge-base-documents", projectId, knowledgeBases.data?.map((base) => base.id)],
+  });
   const create = useMutation({
     mutationFn: () => createKnowledgeBase(apiRequest, projectId, name),
     onSuccess: () => {
       setName("");
       void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", projectId] });
     },
+  });
+  const remove = useMutation({
+    mutationFn: (input: { knowledgeBaseId: string; documentId: string }) =>
+      deleteDocument(apiRequest, projectId, input.knowledgeBaseId, input.documentId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-documents", projectId] }),
   });
 
   async function upload(knowledgeBaseId: string, file: File): Promise<void> {
@@ -73,7 +91,10 @@ export function KnowledgeBasesPanel({
       ) : null}
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {progress !== null ? (
-        <p className="text-sm text-slate-600">Upload progress: {progress}%</p>
+        <p className="text-sm text-slate-600" role="status">
+          Upload progress: {progress}%
+          {progress === 100 ? " · Upload complete; indexing status is shown below." : ""}
+        </p>
       ) : null}
       {knowledgeBases.data?.map((knowledgeBase) => (
         <div
@@ -101,6 +122,28 @@ export function KnowledgeBasesPanel({
           ) : null}
         </div>
       ))}
+      {documents.isLoading ? <p className="text-sm text-slate-600">Loading documents...</p> : null}
+      {documents.isError ? (
+        <p className="text-sm text-red-700">Unable to load document status.</p>
+      ) : null}
+      {documents.data?.length ? (
+        <div className="grid gap-2 border-t border-slate-100 pt-3">
+          <p className="text-sm font-semibold text-slate-800">Documents</p>
+          {documents.data.map((document) => (
+            <div key={document.id} className="flex items-center justify-between text-sm">
+              <span className="truncate text-slate-700">{document.originalFilename}</span>
+              <div className="ml-3 flex items-center gap-2">
+                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{document.status}</span>
+                {canEdit && document.status !== "ARCHIVED" ? (
+                  <button className="text-xs font-medium text-red-700" type="button" onClick={() => {
+                    if (confirm(`Delete ${document.originalFilename}?`)) remove.mutate({ documentId: document.id, knowledgeBaseId: document.knowledgeBaseId });
+                  }}>Delete</button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import type { AuthenticatedUser } from "../../common/auth/authenticated-request";
@@ -21,6 +22,7 @@ import { FeedbackDto, RetrievalRequestDto } from "./dto/retrieval-request.dto";
 import { RetrievalService } from "./retrieval.service";
 
 @Controller("projects/:projectId/retrieval")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 @UseGuards(JwtAuthGuard, ProjectAccessGuard)
 export class RetrievalController {
   constructor(@Inject(RetrievalService) private readonly service: RetrievalService) {}

@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EnvironmentName = Literal["development", "test", "staging", "production"]
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
         default=1000, ge=128, le=16000, validation_alias="AGENT_CRITIC_MAX_TOKENS"
     )
     agent_model_timeout_seconds: float = Field(
-        default=120.0, gt=0, le=600, validation_alias="AGENT_MODEL_TIMEOUT_SECONDS"
+        default=300.0, gt=0, le=600, validation_alias="AGENT_MODEL_TIMEOUT_SECONDS"
     )
     analysis_min_quality_score: float = Field(
         default=0.7, ge=0, le=1, validation_alias="ANALYSIS_MIN_QUALITY_SCORE"
@@ -95,9 +95,64 @@ class Settings(BaseSettings):
     analysis_allow_degraded_report: bool = Field(
         default=True, validation_alias="ANALYSIS_ALLOW_DEGRADED_REPORT"
     )
+    external_research_enabled: bool = Field(
+        default=False, validation_alias="EXTERNAL_RESEARCH_ENABLED"
+    )
+    external_research_default_mode: Literal["INTERNAL_ONLY", "EXTERNAL_ONLY", "HYBRID"] = Field(
+        default="INTERNAL_ONLY", validation_alias="EXTERNAL_RESEARCH_DEFAULT_MODE"
+    )
+    research_provider: str = Field(default="fake", validation_alias="RESEARCH_PROVIDER")
+    research_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="RESEARCH_API_KEY")
+    research_max_queries: int = Field(
+        default=3, ge=1, le=5, validation_alias="RESEARCH_MAX_QUERIES"
+    )
+    research_results_per_query: int = Field(
+        default=5, ge=1, le=20, validation_alias="RESEARCH_RESULTS_PER_QUERY"
+    )
+    research_max_fetched_pages: int = Field(
+        default=5, ge=1, le=20, validation_alias="RESEARCH_MAX_FETCHED_PAGES"
+    )
+    research_max_page_bytes: int = Field(
+        default=500_000, ge=1_024, le=5_000_000, validation_alias="RESEARCH_MAX_PAGE_BYTES"
+    )
+    research_max_total_bytes: int = Field(
+        default=2_000_000, ge=1_024, le=20_000_000, validation_alias="RESEARCH_MAX_TOTAL_BYTES"
+    )
+    research_max_redirects: int = Field(
+        default=3, ge=0, le=10, validation_alias="RESEARCH_MAX_REDIRECTS"
+    )
+    research_fetch_timeout_seconds: float = Field(
+        default=10.0, gt=0, le=60, validation_alias="RESEARCH_FETCH_TIMEOUT_SECONDS"
+    )
+    research_total_timeout_seconds: float = Field(
+        default=60.0, gt=0, le=300, validation_alias="RESEARCH_TOTAL_TIMEOUT_SECONDS"
+    )
+    research_max_context_tokens: int = Field(
+        default=4_000, ge=256, le=100_000, validation_alias="RESEARCH_MAX_CONTEXT_TOKENS"
+    )
+    research_policy_version: str = Field(
+        default="phase-6-v1",
+        min_length=1,
+        max_length=100,
+        validation_alias="RESEARCH_POLICY_VERSION",
+    )
+    research_allowed_schemes: str = Field(
+        default="http,https", validation_alias="RESEARCH_ALLOWED_SCHEMES"
+    )
+    research_allowed_content_types: str = Field(
+        default="text/html,text/plain,application/xhtml+xml",
+        validation_alias="RESEARCH_ALLOWED_CONTENT_TYPES",
+    )
+    research_block_private_networks: bool = Field(
+        default=True, validation_alias="RESEARCH_BLOCK_PRIVATE_NETWORKS"
+    )
+    research_domain_allowlist: str = Field(default="", validation_alias="RESEARCH_DOMAIN_ALLOWLIST")
+    research_domain_denylist: str = Field(default="", validation_alias="RESEARCH_DOMAIN_DENYLIST")
     service_name: str = Field(default="ai-service", min_length=1)
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../../.env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
     @field_validator(
         "ai_service_url", "langfuse_host", "minio_endpoint", "ollama_url", "qdrant_url"
@@ -108,6 +163,16 @@ class Settings(BaseSettings):
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("Expected an absolute HTTP(S) URL")
         return value
+
+    @model_validator(mode="after")
+    def validate_research_provider(self) -> "Settings":
+        if (
+            self.external_research_enabled
+            and self.research_provider.casefold() == "brave"
+            and not self.research_api_key.get_secret_value()
+        ):
+            raise ValueError("RESEARCH_API_KEY is required when the Brave provider is enabled")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

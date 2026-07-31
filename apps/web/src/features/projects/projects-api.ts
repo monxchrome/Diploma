@@ -1,6 +1,7 @@
 import {
   AuthSessionSummarySchema,
   KnowledgeBaseSchema,
+  DocumentSchema,
   PaginatedResponseSchema,
   ProjectMemberSchema,
   ProjectSchema,
@@ -8,6 +9,7 @@ import {
   SafeUserSchema,
   SystemStatusResponseSchema,
   AskResponseSchema,
+  ResearchPolicySchema,
   SearchResponseSchema,
   type AskResponse,
   type SearchResponse,
@@ -48,9 +50,23 @@ export const AnalysisRunSchema = z
       .object({
         report: z.unknown(),
         citations: z.array(z.unknown()).catch([]),
+        externalCitations: z.array(z.unknown()).catch([]),
       })
       .nullable()
       .optional(),
+  })
+  .passthrough();
+
+export const ResearchRunSchema = z
+  .object({
+    id: z.string().uuid(),
+    status: z.string(),
+    plan: z.unknown().nullable(),
+    queryCount: z.number().int(),
+    selectedSourceCount: z.number().int(),
+    failureCode: z.string().nullable(),
+    failureMessage: z.string().nullable(),
+    externalEvidence: z.array(z.unknown()).catch([]),
   })
   .passthrough();
 
@@ -69,6 +85,8 @@ export const AnalysisDetailSchema = z
     knowledgeBaseIds: jsonIdList,
     documentIds: jsonIdList,
     mode: z.enum(["SINGLE_AGENT", "MULTI_AGENT"]),
+    evidenceMode: z.enum(["INTERNAL_ONLY", "EXTERNAL_ONLY", "HYBRID"]).default("INTERNAL_ONLY"),
+    externalResearchEnabled: z.boolean().default(false),
     requestedSpecialists: z.array(z.string()).catch([]),
     additionalContext: z.string().nullable(),
     createdAt: z.string().datetime(),
@@ -96,10 +114,7 @@ export function fetchAnalysis(
   projectId: string,
   analysisId: string,
 ): Promise<AnalysisDetail> {
-  return apiRequest(
-    `/api/projects/${projectId}/analyses/${analysisId}`,
-    AnalysisDetailSchema,
-  );
+  return apiRequest(`/api/projects/${projectId}/analyses/${analysisId}`, AnalysisDetailSchema);
 }
 
 export function createAnalysis(
@@ -118,6 +133,16 @@ export function createAnalysis(
     knowledgeBaseIds: string[];
     documentIds: string[];
     requestedSpecialists: string[];
+    evidenceMode?: "INTERNAL_ONLY" | "EXTERNAL_ONLY" | "HYBRID";
+    externalResearchEnabled?: boolean;
+    researchCountry?: string;
+    researchLanguages?: string[];
+    publishedAfter?: string;
+    publishedBefore?: string;
+    preferredDomains?: string[];
+    excludedDomains?: string[];
+    sourceTypes?: string[];
+    maximumExternalSources?: number;
   },
 ): Promise<AnalysisDetail> {
   return apiRequest(`/api/projects/${projectId}/analyses`, AnalysisDetailSchema, {
@@ -126,23 +151,69 @@ export function createAnalysis(
   });
 }
 
+export function fetchResearchPolicy(apiRequest: ApiRequest, projectId: string) {
+  return apiRequest(`/api/projects/${projectId}/research/policy`, ResearchPolicySchema);
+}
+
+export function fetchAnalysisResearch(
+  apiRequest: ApiRequest,
+  projectId: string,
+  analysisId: string,
+  runId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/analyses/${analysisId}/runs/${runId}/research`,
+    ResearchRunSchema,
+  );
+}
+
+export function fetchAnalysisResearchQueries(
+  apiRequest: ApiRequest,
+  projectId: string,
+  analysisId: string,
+  runId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/analyses/${analysisId}/runs/${runId}/research/queries`,
+    z.array(z.unknown()),
+  );
+}
+
+export function fetchAnalysisResearchSources(
+  apiRequest: ApiRequest,
+  projectId: string,
+  analysisId: string,
+  runId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/analyses/${analysisId}/runs/${runId}/research/sources`,
+    z.array(z.unknown()),
+  );
+}
+
+export function fetchAnalysisResearchConflicts(
+  apiRequest: ApiRequest,
+  projectId: string,
+  analysisId: string,
+  runId: string,
+) {
+  return apiRequest(
+    `/api/projects/${projectId}/analyses/${analysisId}/runs/${runId}/research/conflicts`,
+    z.array(z.unknown()),
+  );
+}
+
 export function runAnalysis(
   apiRequest: ApiRequest,
   projectId: string,
   analysisId: string,
 ): Promise<AnalysisRun> {
-  return apiRequest(
-    `/api/projects/${projectId}/analyses/${analysisId}/run`,
-    AnalysisRunSchema,
-    { method: "POST" },
-  );
+  return apiRequest(`/api/projects/${projectId}/analyses/${analysisId}/run`, AnalysisRunSchema, {
+    method: "POST",
+  });
 }
 
-export function cancelAnalysis(
-  apiRequest: ApiRequest,
-  projectId: string,
-  analysisId: string,
-) {
+export function cancelAnalysis(apiRequest: ApiRequest, projectId: string, analysisId: string) {
   return apiRequest(
     `/api/projects/${projectId}/analyses/${analysisId}/cancel`,
     z.object({ id: z.string().uuid(), cancellationRequested: z.boolean() }),
@@ -201,6 +272,17 @@ export function createKnowledgeBase(apiRequest: ApiRequest, projectId: string, n
     body: { name },
     method: "POST",
   });
+}
+
+export function fetchDocuments(apiRequest: ApiRequest, projectId: string, knowledgeBaseId: string) {
+  return apiRequest(
+    `/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents`,
+    z.array(DocumentSchema),
+  );
+}
+
+export function deleteDocument(apiRequest: ApiRequest, projectId: string, knowledgeBaseId: string, documentId: string) {
+  return apiRequest(`/api/projects/${projectId}/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`, z.unknown(), { method: "DELETE" });
 }
 
 export function createUploadIntent(

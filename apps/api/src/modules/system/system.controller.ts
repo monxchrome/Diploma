@@ -7,11 +7,12 @@ import { getRequestId } from "../../common/logging/request-id";
 import { SystemService } from "./system.service";
 
 @Controller("system")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 export class SystemController {
   constructor(@Inject(SystemService) private readonly systemService: SystemService) {}
 
   @Get("status")
-  @SkipThrottle()
+  @SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true, default: true })
   getStatus(@Req() request: Request): Promise<SystemStatusResponse> {
     return this.systemService.getStatus(getRequestId(request));
   }

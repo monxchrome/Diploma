@@ -1,0 +1,904 @@
+$ tsx watch src/main.ts
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0
+node:net:2009
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:2009:16)
+    at listenInCluster (node:net:2066:12)
+    at Server.listen (node:net:2171:7)
+    at ExpressAdapter.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+platform-express@11_0b82fb32c7fa8163fa3c3327147b8016\node_modules\@nestjs\platform-express\adapters\express-adapter.js:115:32)
+    at C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:190:30
+    at new Promise (<anonymous>)
+    at NestApplication.listen (C:\Users\samok\.codex\worktrees\1663\Diploma\node_modules\.pnpm\@nestjs+core@11.1.28_@nestj_3296f41e6b0d8b37a3fecf1e276a47c1\node_modules\@nestjs\core\nest-application.js:180:16)
+    at async bootstrap (C:\Users\samok\.codex\worktrees\1663\Diploma\apps\api\src\main.ts:50:3) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+
+Node.js v24.18.0

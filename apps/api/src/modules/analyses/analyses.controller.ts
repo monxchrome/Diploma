@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import type { AuthenticatedUser } from "../../common/auth/authenticated-request";
@@ -12,26 +23,70 @@ import { parseCreateAnalysis } from "./dto/create-analysis.dto";
 import { AnalysesService } from "./analyses.service";
 
 @Controller("projects/:projectId/analyses")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 @UseGuards(JwtAuthGuard, ProjectAccessGuard)
 export class AnalysesController {
   constructor(@Inject(AnalysesService) private readonly analyses: AnalysesService) {}
 
   @Post()
-  create(@Body() body: unknown, @CurrentUser() user: AuthenticatedUser, @CurrentProjectAccess() access: ProjectAccess, @Param("projectId", ParseUUIDPipe) projectId: string, @Req() request: Request) {
-    return this.analyses.create({ body: parseCreateAnalysis(body), projectId, userId: user.id, role: access.role, requestId: getRequestId(request) });
+  create(
+    @Body() body: unknown,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentProjectAccess() access: ProjectAccess,
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Req() request: Request,
+  ) {
+    return this.analyses.create({
+      body: parseCreateAnalysis(body),
+      projectId,
+      userId: user.id,
+      role: access.role,
+      requestId: getRequestId(request),
+    });
   }
 
   @Get()
-  list(@Param("projectId", ParseUUIDPipe) projectId: string) { return this.analyses.list(projectId); }
+  list(@Param("projectId", ParseUUIDPipe) projectId: string) {
+    return this.analyses.list(projectId);
+  }
 
   @Get(":analysisId")
-  get(@Param("projectId", ParseUUIDPipe) projectId: string, @Param("analysisId", ParseUUIDPipe) analysisId: string) { return this.analyses.get(projectId, analysisId); }
+  get(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("analysisId", ParseUUIDPipe) analysisId: string,
+  ) {
+    return this.analyses.get(projectId, analysisId);
+  }
 
   @Post(":analysisId/run")
-  run(@CurrentUser() user: AuthenticatedUser, @CurrentProjectAccess() access: ProjectAccess, @Param("projectId", ParseUUIDPipe) projectId: string, @Param("analysisId", ParseUUIDPipe) analysisId: string, @Req() request: Request) {
-    return this.analyses.run({ projectId, analysisId, userId: user.id, role: access.role, requestId: getRequestId(request) });
+  run(
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentProjectAccess() access: ProjectAccess,
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("analysisId", ParseUUIDPipe) analysisId: string,
+    @Req() request: Request,
+  ) {
+    return this.analyses.run({
+      projectId,
+      analysisId,
+      userId: user.id,
+      role: access.role,
+      requestId: getRequestId(request),
+    });
   }
 
   @Post(":analysisId/cancel")
-  cancel(@CurrentProjectAccess() access: ProjectAccess, @Param("projectId", ParseUUIDPipe) projectId: string, @Param("analysisId", ParseUUIDPipe) analysisId: string) { return this.analyses.cancel({ projectId, analysisId, role: access.role }); }
+  cancel(
+    @CurrentProjectAccess() access: ProjectAccess,
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("analysisId", ParseUUIDPipe) analysisId: string,
+    @Req() request: Request,
+  ) {
+    return this.analyses.cancel({
+      projectId,
+      analysisId,
+      role: access.role,
+      requestId: getRequestId(request),
+    });
+  }
 }

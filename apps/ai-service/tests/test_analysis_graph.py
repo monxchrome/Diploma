@@ -5,11 +5,15 @@ from pydantic import BaseModel
 
 from app.graphs.analysis_graph import (
     REQUIRED_REPORT_SECTIONS,
+    best_risk_citation,
     citation_quote,
+    citation_specificity_reasons,
     citation_validator,
     clip_at_word,
     critic_passes,
+    evidence_pack,
     execute_analysis,
+    grounding_metrics,
     local_critic_reasons,
 )
 from app.infrastructure.analysis_models import (
@@ -18,7 +22,7 @@ from app.infrastructure.analysis_models import (
     ModelNodeConfig,
     ModelUnavailableError,
 )
-from app.schemas.analysis import AnalysisInput, AnalysisReport
+from app.schemas.analysis import AnalysisInput, AnalysisReport, EvidenceReference, RiskModelItem
 from app.schemas.contracts import AiCitation, RetrievalEvidence
 
 OutputModel = TypeVar("OutputModel", bound=BaseModel)
@@ -89,6 +93,32 @@ def analysis_input() -> AnalysisInput:
                 "expansion. An extended pilot or postponed expansion remains available.",
             ),
         ],
+    )
+
+
+def hybrid_analysis_input() -> AnalysisInput:
+    payload = analysis_input()
+    return payload.model_copy(
+        update={
+            "evidence_mode": "HYBRID",
+            "external_research_enabled": True,
+            "assumptions": ["Demand is not yet validated"],
+            "initial_evidence": [
+                *payload.initial_evidence,
+                evidence(
+                    "W1",
+                    "research-source-1",
+                    "Spain public market context: the synthetic public dataset indicates that "
+                    "market validation remains necessary before expansion.",
+                ),
+                evidence(
+                    "W2",
+                    "research-source-2",
+                    "The synthetic external scenario conflicts with the internal assumption "
+                    "that demand has already been validated.",
+                ),
+            ],
+        }
     )
 
 
@@ -438,6 +468,144 @@ async def test_specialist_outputs_materially_differ_and_coordinator_uses_them() 
     assert "evidencePack" not in provider.coordinator_input
 
 
+async def test_selected_external_evidence_reaches_coordinator() -> None:
+    provider = FakeChatModelProvider()
+    response = await execute_analysis(hybrid_analysis_input(), fake_runtime(provider))
+
+    assert provider.coordinator_input is not None
+    external = provider.coordinator_input["externalEvidence"]
+    assert {item["evidenceId"] for item in external} == {"W1", "W2"}  # type: ignore[index]
+    internal = provider.coordinator_input["internalEvidence"]
+    assert {item["evidenceId"] for item in internal} == {  # type: ignore[index]
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "E5",
+    }
+    assert {
+        item.evidence_id for result in response.specialist_results for item in result.citations
+    } <= {
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "E5",
+    }
+
+
+async def test_supported_external_claim_receives_w_citation() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+
+    context = next(
+        item for item in response.report.external_context if "market validation" in item.claim
+    )
+    assert [item.evidence_id for item in context.citations] == ["W1"]
+    assert any(item.evidence_id == "W1" for item in response.report.citations)
+
+
+async def test_w_citation_is_not_added_to_an_unsupported_claim() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+
+    assert "W1" not in response.report.financial_assessment
+    assert any("W2" in item.claim for item in response.report.external_context)
+
+
+async def test_aligned_external_assumption_does_not_create_conflict() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+
+    assert not response.report.evidence_conflicts
+    assert any("W2" in item.claim for item in response.report.external_context)
+
+
+async def test_current_validated_assumption_creates_w2_conflict() -> None:
+    request = hybrid_analysis_input().model_copy(
+        update={"assumptions": ["Demand has already been validated."]}
+    )
+    response = await execute_analysis(request, fake_runtime(FakeChatModelProvider()))
+
+    assert response.report.evidence_conflicts
+    conflict = response.report.evidence_conflicts[0]
+    assert conflict.citations[0].evidence_id == "W2"
+    assert "demand has already been validated" in conflict.internal_position.casefold()
+
+
+async def test_external_conflict_lowers_confidence_or_adds_limitation() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+
+    assert response.report.confidence != "HIGH" or response.report.limitations
+
+
+async def test_quality_gate_response_lists_exact_failed_checks() -> None:
+    response = await execute_analysis(
+        analysis_input(), fake_runtime(FakeChatModelProvider(quality_score=0.25))
+    )
+
+    failed = {
+        item.check: item.detail for item in response.report.quality_gate_checks if not item.passed
+    }
+    assert "quality score minimum" in failed
+    assert "0.25" in failed["quality score minimum"]
+    assert "0.70" in failed["quality score minimum"]
+
+
+async def test_risk_categories_match_risk_type() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+    competition = response.report.risk_register[0]
+    assert "competition" in competition.risk.casefold()
+    assert competition.category == "MARKET"
+
+
+async def test_mitigation_cannot_be_both_evidence_backed_and_analytical() -> None:
+    response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
+    for risk in response.report.risk_register:
+        assert not (
+            risk.mitigation_basis == "ANALYTICAL_RECOMMENDATION"
+            and "evidence_backed" in risk.mitigation.casefold()
+        )
+
+
+async def test_empty_report_sections_are_omitted() -> None:
+    payload = analysis_input().model_copy(update={"assumptions": []})
+    response = await execute_analysis(payload, fake_runtime(FakeChatModelProvider()))
+
+    assert "Assumptions" not in {section.title for section in response.report.sections}
+
+
+async def test_internal_only_creates_no_w_evidence() -> None:
+    payload = analysis_input().model_copy(
+        update={
+            "initial_evidence": [
+                *analysis_input().initial_evidence,
+                evidence(
+                    "W1",
+                    "research-source-1",
+                    "Public context says market validation remains necessary before expansion.",
+                ),
+            ],
+            "evidence_mode": "INTERNAL_ONLY",
+            "external_research_enabled": False,
+        }
+    )
+    provider = FakeChatModelProvider()
+    response = await execute_analysis(payload, fake_runtime(provider))
+
+    assert not response.report.external_context
+    assert not any(item.evidence_id.startswith("W") for item in response.report.citations)
+    coordinator = provider.coordinator_input
+    assert coordinator is not None and coordinator["externalEvidence"] == []
+
+
 async def test_financial_output_contains_required_structured_metrics() -> None:
     response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
     result = next(item for item in response.specialist_results if item.specialist == "FINANCIAL")
@@ -550,9 +718,122 @@ async def test_report_contains_all_required_structures() -> None:
 
     assert set(REQUIRED_REPORT_SECTIONS[1:]).issubset(titles)
     assert len(response.report.alternatives) >= 4
+
+
+async def test_report_quality_and_decision_readiness_are_independent() -> None:
+    response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
+
+    assert response.report.quality_gate_passed is True
+    assert response.report.report_quality_score >= 0.7
+    assert response.report.grounding_score >= 0.7
+    assert response.report.decision_ready is False
+    assert response.report.decision_readiness == "LOW"
+    assert response.report.evidence_sufficiency_score < response.report.report_quality_score
+    assert response.report.confidence == "LOW"
+    assert any(not check.passed for check in response.report.readiness_checks)
+
+
+async def test_readiness_failure_does_not_zero_a_grounded_report() -> None:
+    response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
+
+    assert response.report.report_quality_score == pytest.approx(0.94)
+    assert response.report.quality_score == pytest.approx(0.94)
+    assert response.report.decision_readiness_score < response.report.report_quality_score
+    assert "Use ." not in response.report.model_dump_json()
+    assert all(
+        risk.mitigation_basis in {"EVIDENCE_BACKED", "ANALYTICAL_RECOMMENDATION"}
+        for risk in response.report.risk_register
+    )
+
+
+def test_hybrid_evidence_pack_preserves_internal_and_external_items() -> None:
+    request = hybrid_analysis_input()
+    pack = evidence_pack("MARKET", request.initial_evidence)
+    assert {item.evidence_id for item in pack} >= {"E1", "W1", "W2"}
+
+
+async def test_unsupported_numeric_claim_lowers_grounding() -> None:
+    response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
+    report = response.report.model_copy(
+        update={"executive_summary": "The budget is EUR 999999 and CAC is EUR 1."}
+    )
+    grounding, _, unsupported, _, _ = grounding_metrics(report, analysis_input().initial_evidence)
+    assert unsupported > 0
+    assert grounding < 1.0
     assert response.report.risk_register
     assert response.report.implementation_roadmap
     assert response.report.missing_information
+
+
+def test_thematic_similarity_does_not_validate_external_risk_claims() -> None:
+    request = hybrid_analysis_input()
+    w1 = next(item for item in request.initial_evidence if item.evidence_id == "W1")
+    risk = RiskModelItem(
+        risk="Strong local competition",
+        category="MARKET",
+        likelihood="MEDIUM",
+        impact="HIGH",
+        mitigation="Validate competitors before spend.",
+        mitigationBasis="ANALYTICAL_RECOMMENDATION",
+        residualRisk="MEDIUM",
+        uncertainty="Competitor evidence is not available yet.",
+        citations=[EvidenceReference(evidenceId="W1", documentId=w1.document_id)],
+    )
+    assert best_risk_citation(risk, request.initial_evidence, risk.citations) == []
+
+
+def test_internal_risk_receives_matching_evidence_citation() -> None:
+    request = analysis_input()
+    e4 = next(item for item in request.initial_evidence if item.evidence_id == "E4")
+    risk = RiskModelItem(
+        risk="Strong local competition",
+        category="MARKET",
+        likelihood="MEDIUM",
+        impact="HIGH",
+        mitigation="Validate competitors before spend.",
+        mitigationBasis="ANALYTICAL_RECOMMENDATION",
+        residualRisk="MEDIUM",
+        uncertainty="Competitor evidence is not available yet.",
+        citations=[EvidenceReference(evidenceId="E4", documentId=e4.document_id)],
+    )
+    assert best_risk_citation(risk, request.initial_evidence, risk.citations)[0].evidence_id == "E4"
+
+
+async def test_final_metrics_reject_thematic_w1_risk_citation() -> None:
+    response = await execute_analysis(
+        hybrid_analysis_input(), fake_runtime(FakeChatModelProvider())
+    )
+    w1 = next(item for item in hybrid_analysis_input().initial_evidence if item.evidence_id == "W1")
+    bad_risk = response.report.risk_register[0].model_copy(
+        update={
+            "risk": "Strong local competition",
+            "citations": [
+                AiCitation(
+                    evidenceId="W1",
+                    documentId=w1.document_id,
+                    quote=w1.snippet,
+                )
+            ],
+        }
+    )
+    report = response.report.model_copy(update={"risk_register": [bad_risk]})
+    grounding, validity, unsupported, _, _ = grounding_metrics(
+        report, hybrid_analysis_input().initial_evidence
+    )
+    assert citation_specificity_reasons(report, hybrid_analysis_input().initial_evidence)
+    assert validity < 1.0
+    assert unsupported > 0
+    assert grounding < 1.0
+
+
+async def test_uncited_document_identified_claim_reduces_evidence_coverage() -> None:
+    response = await execute_analysis(analysis_input(), fake_runtime(FakeChatModelProvider()))
+    report = response.report.model_copy(
+        update={"market_assessment": "The documents identify strong local competition as a risk."}
+    )
+    _, _, unsupported, _, coverage = grounding_metrics(report, analysis_input().initial_evidence)
+    assert unsupported > 0
+    assert coverage < 1.0
 
 
 async def test_citations_are_valid_and_unknown_ids_are_rejected() -> None:

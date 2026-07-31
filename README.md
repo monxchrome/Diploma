@@ -12,7 +12,9 @@ Phase 2 adds identity, access, sessions, profile management, and project managem
 
 Phase 4 adds project-scoped dense, sparse, and hybrid retrieval plus grounded Q&A. There is no web search, tool calling, autonomous agent, or long-term agent memory.
 
-Phase 5 adds a bounded, asynchronous decision-analysis engine. A decision analysis uses the existing project-scoped retrieval boundary, then executes either a single-agent baseline or a fixed LangGraph workflow with allowlisted market, financial, legal/regulatory, risk, and strategy specialists. The graph persists sanitized checkpoints and validates citations before an immutable report is stored. It supports queued-run cancellation and idempotent BullMQ redelivery; it does not add public web search, arbitrary tools, external actions, or agent memory.
+Phase 5 adds a bounded, asynchronous decision-analysis engine. A decision analysis uses the existing project-scoped retrieval boundary, then executes either a single-agent baseline or a fixed LangGraph workflow with allowlisted market, financial, legal/regulatory, risk, and strategy specialists. The graph persists sanitized checkpoints and validates citations before an immutable report is stored. It supports queued-run cancellation and idempotent BullMQ redelivery.
+
+Phase 6 adds controlled, explicitly enabled external research and a scientific evaluation dashboard. Analyses support `INTERNAL_ONLY`, `EXTERNAL_ONLY`, and `HYBRID` evidence modes. External research is disabled by default, follows a server-owned safety policy, uses bounded provider/search/fetch calls, stores immutable source snapshots, and assigns external evidence identifiers `W1…`; no browser can submit provider credentials or arbitrary tools. Phase 6 also adds project-scoped experiment variants, test cases, queued runs, metric exports, and versioned human evaluation. The initial experiment worker reports deterministic synthetic metrics labelled `SYNTHETIC_EVALUATION`; it is a smoke/integration baseline, not a production benchmark.
 
 ## Architecture
 
@@ -74,6 +76,19 @@ DENSE_WEIGHT=1
 SPARSE_WEIGHT=1
 RAG_GENERATION_ENABLED=false
 RAG_MODEL=llama3.2:3b
+EXTERNAL_RESEARCH_ENABLED=false
+EXTERNAL_RESEARCH_DEFAULT_MODE=INTERNAL_ONLY
+RESEARCH_PROVIDER=fake
+RESEARCH_API_KEY=
+RESEARCH_MAX_QUERIES=3
+RESEARCH_MAX_FETCHED_PAGES=5
+RESEARCH_MAX_TOTAL_BYTES=2000000
+RESEARCH_BLOCK_PRIVATE_NETWORKS=true
+RESEARCH_QUEUE_NAME=external-research
+EXPERIMENT_QUEUE_NAME=experiments
+EXPERIMENT_MAX_VARIANTS=4
+EXPERIMENT_MAX_CASES=10
+EVALUATION_RUBRIC_VERSION=phase-6-v1
 ```
 
 Production must replace the JWT secret and refresh pepper, and must use secure cookie settings. `AUTH_COOKIE_SAME_SITE=none` requires `AUTH_COOKIE_SECURE=true`.
@@ -94,6 +109,12 @@ Optional heavier services:
 docker compose --profile ai-heavy up -d ollama
 docker compose --profile observability up -d langfuse
 ```
+
+The Ollama container is configured to use one NVIDIA GPU when Docker Desktop
+GPU support is available. On Windows, enable the WSL 2 engine and GPU support
+in Docker Desktop, then verify the host driver with `nvidia-smi`. To select a
+specific GPU, set `OLLAMA_GPU_DEVICES` (for example, `0`) in `.env`; the CPU
+continues to run the API and other services alongside GPU inference.
 
 ## Development
 
@@ -161,6 +182,28 @@ GET    /api/projects/:projectId/analyses
 GET    /api/projects/:projectId/analyses/:analysisId
 POST   /api/projects/:projectId/analyses/:analysisId/run
 POST   /api/projects/:projectId/analyses/:analysisId/cancel
+GET    /api/projects/:projectId/research/policy
+GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research
+GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research/queries
+GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research/sources
+GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research/conflicts
+GET    /api/projects/:projectId/research/sources/:sourceId
+GET    /api/projects/:projectId/research/sources/:sourceId/snapshots/:snapshotId
+POST   /api/projects/:projectId/experiments
+GET    /api/projects/:projectId/experiments
+GET    /api/projects/:projectId/experiments/:experimentId
+PATCH  /api/projects/:projectId/experiments/:experimentId
+DELETE /api/projects/:projectId/experiments/:experimentId
+POST   /api/projects/:projectId/experiments/:experimentId/variants
+POST   /api/projects/:projectId/experiments/:experimentId/cases
+POST   /api/projects/:projectId/experiments/:experimentId/run
+POST   /api/projects/:projectId/experiments/:experimentId/cancel
+GET    /api/projects/:projectId/experiments/:experimentId/runs
+GET    /api/projects/:projectId/experiments/:experimentId/metrics
+GET    /api/projects/:projectId/experiments/:experimentId/report
+POST   /api/projects/:projectId/experiments/:experimentId/evaluate
+GET    /api/projects/:projectId/experiments/:experimentId/export.json
+GET    /api/projects/:projectId/experiments/:experimentId/export.csv
 ```
 
 ## Commands
@@ -198,6 +241,35 @@ uv run pyright
 uv run pytest
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+The Phase 6 synthetic smoke corpus is at `datasets/phase-6/synthetic-cases.json`. Enable a real provider only with `EXTERNAL_RESEARCH_ENABLED=true`, a configured `RESEARCH_PROVIDER`, and a server-side `RESEARCH_API_KEY`; the provider key is never part of public API input. The research health endpoint is `GET /health/research`; experiment readiness is `GET /health/experiments` on the AI service.
+
+For local deterministic research, create the ignored root `.env` with these exact values:
+
+```dotenv
+EXTERNAL_RESEARCH_ENABLED=true
+EXTERNAL_RESEARCH_DEFAULT_MODE=HYBRID
+RESEARCH_PROVIDER=fake
+RESEARCH_API_KEY=
+RESEARCH_POLICY_VERSION=phase-6-v1
+RESEARCH_MAX_QUERIES=3
+RESEARCH_RESULTS_PER_QUERY=5
+RESEARCH_MAX_FETCHED_PAGES=5
+RESEARCH_MAX_PAGE_BYTES=500000
+RESEARCH_MAX_TOTAL_BYTES=2000000
+RESEARCH_MAX_REDIRECTS=3
+RESEARCH_FETCH_TIMEOUT_SECONDS=10
+RESEARCH_TOTAL_TIMEOUT_SECONDS=60
+RESEARCH_MAX_CONTEXT_TOKENS=4000
+RESEARCH_CACHE_TTL_SECONDS=86400
+RESEARCH_ALLOWED_SCHEMES=http,https
+RESEARCH_ALLOWED_CONTENT_TYPES=text/html,text/plain,application/xhtml+xml
+RESEARCH_BLOCK_PRIVATE_NETWORKS=true
+RESEARCH_DOMAIN_ALLOWLIST=
+RESEARCH_DOMAIN_DENYLIST=
+```
+
+The API and analysis worker use the same root `.env`; the AI service also reads `../../.env` when run from `apps/ai-service`. Startup logs emit only the enabled flag, provider, policy version, and project policy state (`not_configured`); credentials are never logged.
 
 ## End-to-End Smoke Check
 

@@ -66,6 +66,62 @@ enum AnalysisMode {
   MULTI_AGENT
 }
 
+enum EvidenceMode {
+  INTERNAL_ONLY
+  EXTERNAL_ONLY
+  HYBRID
+}
+
+enum ResearchRunStatus {
+  QUEUED
+  PLANNING
+  SEARCHING
+  FETCHING
+  EXTRACTING
+  COMPLETED
+  COMPLETED_WITH_LIMITATIONS
+  FAILED
+  CANCELLED
+}
+
+enum ResearchQueryStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ResearchFetchStatus {
+  FETCHED
+  REJECTED
+  FAILED
+}
+
+enum EvidenceConflictStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum ExperimentStatus {
+  DRAFT
+  QUEUED
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_LIMITATIONS
+  FAILED
+  CANCELLED
+}
+
+enum ExperimentRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_LIMITATIONS
+  FAILED
+  CANCELLED
+}
+
 enum AnalysisStatus {
   DRAFT
   QUEUED
@@ -105,25 +161,27 @@ model SystemCheck {
 }
 
 model User {
-  id              String          @id @default(uuid()) @db.Uuid
-  email           String          @unique
-  passwordHash    String
-  displayName     String
-  globalRole      GlobalRole      @default(USER)
-  status          UserStatus      @default(ACTIVE)
-  emailVerifiedAt DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  sessions        AuthSession[]
-  ownedProjects   Project[]       @relation("ProjectOwner")
-  memberships     ProjectMember[]
-  auditLogs       AuditLog[]      @relation("AuditLogActor")
-  knowledgeBases  KnowledgeBase[] @relation("KnowledgeBaseCreator")
-  documents       Document[]      @relation("DocumentCreator")
-  retrievalRuns   RetrievalRun[]
-  answerFeedback  AnswerFeedback[]
-  analyses        DecisionAnalysis[]
-  analysisRuns    AnalysisRun[]
+  id                    String             @id @default(uuid()) @db.Uuid
+  email                 String             @unique
+  passwordHash          String
+  displayName           String
+  globalRole            GlobalRole         @default(USER)
+  status                UserStatus         @default(ACTIVE)
+  emailVerifiedAt       DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  sessions              AuthSession[]
+  ownedProjects         Project[]          @relation("ProjectOwner")
+  memberships           ProjectMember[]
+  auditLogs             AuditLog[]         @relation("AuditLogActor")
+  knowledgeBases        KnowledgeBase[]    @relation("KnowledgeBaseCreator")
+  documents             Document[]         @relation("DocumentCreator")
+  retrievalRuns         RetrievalRun[]
+  answerFeedback        AnswerFeedback[]
+  analyses              DecisionAnalysis[]
+  analysisRuns          AnalysisRun[]
+  experiments           Experiment[]
+  experimentEvaluations HumanEvaluation[]
 }
 
 model AuthSession {
@@ -146,21 +204,23 @@ model AuthSession {
 }
 
 model Project {
-  id          String          @id @default(uuid()) @db.Uuid
-  ownerId     String          @db.Uuid
-  name        String
-  description String?
-  settings    Json            @default("{}")
-  archivedAt  DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members     ProjectMember[]
-  auditLogs   AuditLog[]
+  id             String             @id @default(uuid()) @db.Uuid
+  ownerId        String             @db.Uuid
+  name           String
+  description    String?
+  settings       Json               @default("{}")
+  archivedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  owner          User               @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members        ProjectMember[]
+  auditLogs      AuditLog[]
   knowledgeBases KnowledgeBase[]
-  retrievalRuns RetrievalRun[]
-  analyses      DecisionAnalysis[]
-  analysisRuns  AnalysisRun[]
+  retrievalRuns  RetrievalRun[]
+  analyses       DecisionAnalysis[]
+  analysisRuns   AnalysisRun[]
+  researchRuns   ResearchRun[]
+  experiments    Experiment[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -186,33 +246,33 @@ model KnowledgeBase {
 }
 
 model Document {
-  id              String         @id @default(uuid()) @db.Uuid
-  knowledgeBaseId String         @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
+  knowledgeBaseId  String            @db.Uuid
   originalFilename String
-  displayName     String
-  status          DocumentStatus @default(PENDING_UPLOAD)
-  mimeType        String?
+  displayName      String
+  status           DocumentStatus    @default(PENDING_UPLOAD)
+  mimeType         String?
   declaredMimeType String
-  sizeBytes       BigInt
-  currentVersionId String?       @unique @db.Uuid
-  createdById     String         @db.Uuid
-  archivedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  knowledgeBase   KnowledgeBase  @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  createdBy       User           @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  versions        DocumentVersion[]
-  currentVersion  DocumentVersion? @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  sizeBytes        BigInt
+  currentVersionId String?           @unique @db.Uuid
+  createdById      String            @db.Uuid
+  archivedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  knowledgeBase    KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  createdBy        User              @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions         DocumentVersion[]
+  currentVersion   DocumentVersion?  @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
 
   @@index([knowledgeBaseId, status, createdAt])
   @@index([knowledgeBaseId, archivedAt])
 }
 
 model DocumentVersion {
-  id                 String         @id @default(uuid()) @db.Uuid
-  documentId         String         @db.Uuid
+  id                 String          @id @default(uuid()) @db.Uuid
+  documentId         String          @db.Uuid
   version            Int
-  storageKey         String         @unique
+  storageKey         String          @unique
   checksumSha256     String?
   detectedMimeType   String?
   parserName         String?
@@ -224,13 +284,13 @@ model DocumentVersion {
   pageCount          Int?
   characterCount     Int?
   tokenCount         Int?
-  status             DocumentStatus @default(PENDING_UPLOAD)
+  status             DocumentStatus  @default(PENDING_UPLOAD)
   errorCode          String?
   errorMessage       String?
-  createdAt          DateTime       @default(now())
+  createdAt          DateTime        @default(now())
   completedAt        DateTime?
-  document           Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  activeForDocument  Document?      @relation("CurrentDocumentVersion")
+  document           Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  activeForDocument  Document?       @relation("CurrentDocumentVersion")
   chunks             DocumentChunk[]
   ingestionJobs      IngestionJob[]
 
@@ -280,12 +340,12 @@ model RetrievalRun {
 }
 
 model RagResponse {
-  id                   String          @id @default(uuid()) @db.Uuid
-  retrievalRunId       String          @unique @db.Uuid
+  id                   String           @id @default(uuid()) @db.Uuid
+  retrievalRunId       String           @unique @db.Uuid
   answer               String
-  insufficientEvidence Boolean         @default(false)
-  createdAt            DateTime        @default(now())
-  retrievalRun         RetrievalRun    @relation(fields: [retrievalRunId], references: [id], onDelete: Cascade)
+  insufficientEvidence Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  retrievalRun         RetrievalRun     @relation(fields: [retrievalRunId], references: [id], onDelete: Cascade)
   citations            RagCitation[]
   feedback             AnswerFeedback[]
 }
@@ -340,64 +400,77 @@ model IngestionJob {
 }
 
 model DecisionAnalysis {
-  id                   String       @id @default(uuid()) @db.Uuid
-  projectId            String       @db.Uuid
-  createdById          String       @db.Uuid
-  title                String
-  decisionQuestion     String
-  objectives           Json         @default("[]")
-  constraints          Json         @default("[]")
-  assumptions          Json         @default("[]")
-  timeHorizon          String?
-  targetMarket         String?
-  currency             String?
-  knowledgeBaseIds     Json
-  documentIds          Json         @default("[]")
-  mode                 AnalysisMode
-  requestedSpecialists Json         @default("[]")
-  additionalContext    String?
-  archivedAt           DateTime?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
-  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy            User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  runs                 AnalysisRun[]
+  id                      String        @id @default(uuid()) @db.Uuid
+  projectId               String        @db.Uuid
+  createdById             String        @db.Uuid
+  title                   String
+  decisionQuestion        String
+  objectives              Json          @default("[]")
+  constraints             Json          @default("[]")
+  assumptions             Json          @default("[]")
+  timeHorizon             String?
+  targetMarket            String?
+  currency                String?
+  knowledgeBaseIds        Json
+  documentIds             Json          @default("[]")
+  mode                    AnalysisMode
+  evidenceMode            EvidenceMode  @default(INTERNAL_ONLY)
+  externalResearchEnabled Boolean       @default(false)
+  researchCountry         String?
+  researchLanguages       Json          @default("[]")
+  publishedAfter          DateTime?
+  publishedBefore         DateTime?
+  preferredDomains        Json          @default("[]")
+  excludedDomains         Json          @default("[]")
+  sourceTypes             Json          @default("[]")
+  maximumExternalSources  Int?
+  requestedSpecialists    Json          @default("[]")
+  additionalContext       String?
+  archivedAt              DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  project                 Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy               User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  runs                    AnalysisRun[]
 
   @@index([projectId, archivedAt, createdAt])
   @@index([createdById, createdAt])
 }
 
 model AnalysisRun {
-  id                   String         @id @default(uuid()) @db.Uuid
-  analysisId           String         @db.Uuid
-  projectId            String         @db.Uuid
-  userId               String         @db.Uuid
-  status               AnalysisStatus @default(DRAFT)
-  threadId             String         @unique
-  graphVersion         String
-  promptVersions       Json           @default("{}")
-  bullJobId            String?        @unique
-  cancellationRequested Boolean       @default(false)
-  currentStage         String?
-  progress             Int            @default(0)
-  plan                 Json?
-  initialRetrievalRunId String?       @db.Uuid
-  tokenUsage           Json           @default("{}")
-  estimatedCost        Decimal?       @db.Decimal(12, 6)
-  timingsMs            Json           @default("{}")
-  errorCode            String?
-  errorMessage         String?
-  startedAt            DateTime?
-  completedAt          DateTime?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  analysis             DecisionAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
-  project              Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-  retrievalRun         RetrievalRun?  @relation(fields: [initialRetrievalRunId], references: [id], onDelete: SetNull)
-  agentRuns            AgentRun[]
-  report               AnalysisReport?
-  checkpoints          AnalysisCheckpoint[]
+  id                    String               @id @default(uuid()) @db.Uuid
+  analysisId            String               @db.Uuid
+  projectId             String               @db.Uuid
+  userId                String               @db.Uuid
+  status                AnalysisStatus       @default(DRAFT)
+  threadId              String               @unique
+  graphVersion          String
+  promptVersions        Json                 @default("{}")
+  bullJobId             String?              @unique
+  cancellationRequested Boolean              @default(false)
+  currentStage          String?
+  progress              Int                  @default(0)
+  plan                  Json?
+  initialRetrievalRunId String?              @db.Uuid
+  tokenUsage            Json                 @default("{}")
+  estimatedCost         Decimal?             @db.Decimal(12, 6)
+  timingsMs             Json                 @default("{}")
+  errorCode             String?
+  errorMessage          String?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  analysis              DecisionAnalysis     @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  project               Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  retrievalRun          RetrievalRun?        @relation(fields: [initialRetrievalRunId], references: [id], onDelete: SetNull)
+  agentRuns             AgentRun[]
+  report                AnalysisReport?
+  checkpoints           AnalysisCheckpoint[]
+  researchRun           ResearchRun?
+  evidenceConflicts     EvidenceConflict[]
+  experimentRuns        ExperimentRun[]
 
   @@index([analysisId, createdAt])
   @@index([projectId, status, createdAt])
@@ -405,34 +478,35 @@ model AnalysisRun {
 }
 
 model AgentRun {
-  id            String         @id @default(uuid()) @db.Uuid
-  analysisRunId String         @db.Uuid
+  id            String          @id @default(uuid()) @db.Uuid
+  analysisRunId String          @db.Uuid
   specialist    SpecialistType?
   nodeName      String
-  status        AgentRunStatus @default(PENDING)
+  status        AgentRunStatus  @default(PENDING)
   result        Json?
-  tokenUsage    Json           @default("{}")
-  timingsMs     Json           @default("{}")
+  tokenUsage    Json            @default("{}")
+  timingsMs     Json            @default("{}")
   errorCode     String?
   errorMessage  String?
   startedAt     DateTime?
   completedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  analysisRun   AnalysisRun    @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  analysisRun   AnalysisRun     @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
 
   @@unique([analysisRunId, nodeName])
   @@index([analysisRunId, status])
 }
 
 model AnalysisReport {
-  id            String      @id @default(uuid()) @db.Uuid
-  analysisRunId String      @unique @db.Uuid
-  report        Json
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
-  citations     AnalysisCitation[]
+  id                String                     @id @default(uuid()) @db.Uuid
+  analysisRunId     String                     @unique @db.Uuid
+  report            Json
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  analysisRun       AnalysisRun                @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  citations         AnalysisCitation[]
+  externalCitations ExternalAnalysisCitation[]
 }
 
 model AnalysisCitation {
@@ -460,6 +534,291 @@ model AnalysisCheckpoint {
 
   @@unique([analysisRunId, nodeName])
   @@index([createdAt])
+}
+
+model ResearchRun {
+  id                       String             @id @default(uuid()) @db.Uuid
+  analysisRunId            String             @unique @db.Uuid
+  projectId                String             @db.Uuid
+  status                   ResearchRunStatus  @default(QUEUED)
+  evidenceMode             EvidenceMode
+  provider                 String
+  policyVersion            String
+  plan                     Json?
+  queryCount               Int                @default(0)
+  resultCount              Int                @default(0)
+  fetchedPageCount         Int                @default(0)
+  selectedSourceCount      Int                @default(0)
+  totalFetchedBytes        Int                @default(0)
+  totalExtractedCharacters Int                @default(0)
+  totalDurationMs          Int?
+  searchDurationMs         Int?
+  fetchDurationMs          Int?
+  extractionDurationMs     Int?
+  failureCode              String?
+  failureMessage           String?
+  requestId                String
+  cancellationRequested    Boolean            @default(false)
+  startedAt                DateTime?
+  completedAt              DateTime?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  analysisRun              AnalysisRun        @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  project                  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  queries                  ResearchQuery[]
+  externalEvidence         ExternalEvidence[]
+
+  @@index([projectId, status, createdAt])
+}
+
+model ResearchQuery {
+  id              String                 @id @default(uuid()) @db.Uuid
+  researchRunId   String                 @db.Uuid
+  queryIndex      Int
+  query           String
+  purpose         String
+  country         String?
+  languages       Json                   @default("[]")
+  publishedAfter  DateTime?
+  publishedBefore DateTime?
+  status          ResearchQueryStatus    @default(PENDING)
+  resultCount     Int                    @default(0)
+  durationMs      Int?
+  errorCode       String?
+  createdAt       DateTime               @default(now())
+  researchRun     ResearchRun            @relation(fields: [researchRunId], references: [id], onDelete: Cascade)
+  results         ResearchSearchResult[]
+
+  @@unique([researchRunId, queryIndex])
+  @@index([researchRunId, status])
+}
+
+model ResearchSearchResult {
+  id               String        @id @default(uuid()) @db.Uuid
+  researchQueryId  String        @db.Uuid
+  providerRank     Int
+  title            String
+  url              String
+  normalizedUrl    String
+  domain           String
+  snippet          String
+  publishedAt      DateTime?
+  sourceType       String?
+  selectedForFetch Boolean       @default(false)
+  rejectionReason  String?
+  createdAt        DateTime      @default(now())
+  researchQuery    ResearchQuery @relation(fields: [researchQueryId], references: [id], onDelete: Cascade)
+
+  @@index([researchQueryId, providerRank])
+  @@index([normalizedUrl])
+}
+
+model ResearchSource {
+  id            String             @id @default(uuid()) @db.Uuid
+  normalizedUrl String             @unique
+  domain        String
+  canonicalUrl  String?
+  title         String
+  publisher     String?
+  author        String?
+  sourceType    String?
+  language      String?
+  firstSeenAt   DateTime           @default(now())
+  lastSeenAt    DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  snapshots     ResearchSnapshot[]
+
+  @@index([domain, lastSeenAt])
+}
+
+model ResearchSnapshot {
+  id                      String              @id @default(uuid()) @db.Uuid
+  researchSourceId        String              @db.Uuid
+  contentHash             String
+  fetchStatus             ResearchFetchStatus
+  httpStatus              Int?
+  contentType             String?
+  publishedAt             DateTime?
+  retrievedAt             DateTime            @default(now())
+  extractedTitle          String?
+  extractedText           String
+  extractedMetadata       Json                @default("{}")
+  credibilityAssessment   Json                @default("{}")
+  extractionVersion       String
+  fetchDurationMs         Int?
+  extractedCharacterCount Int                 @default(0)
+  warnings                Json                @default("[]")
+  errorCode               String?
+  errorMessage            String?
+  createdAt               DateTime            @default(now())
+  researchSource          ResearchSource      @relation(fields: [researchSourceId], references: [id], onDelete: Cascade)
+  externalEvidence        ExternalEvidence[]
+
+  @@unique([researchSourceId, contentHash])
+  @@index([retrievedAt])
+}
+
+model ExternalEvidence {
+  id                 String           @id @default(uuid()) @db.Uuid
+  researchRunId      String           @db.Uuid
+  researchSnapshotId String           @db.Uuid
+  evidenceId         String
+  excerpt            String
+  relevanceScore     Float?
+  selected           Boolean          @default(true)
+  metadata           Json             @default("{}")
+  createdAt          DateTime         @default(now())
+  researchRun        ResearchRun      @relation(fields: [researchRunId], references: [id], onDelete: Cascade)
+  researchSnapshot   ResearchSnapshot @relation(fields: [researchSnapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([researchRunId, evidenceId])
+  @@unique([researchRunId, researchSnapshotId])
+  @@index([researchRunId, selected])
+}
+
+model ExternalAnalysisCitation {
+  id                 String         @id @default(uuid()) @db.Uuid
+  analysisReportId   String         @db.Uuid
+  researchRunId      String         @db.Uuid
+  researchSnapshotId String         @db.Uuid
+  evidenceId         String
+  quote              String
+  createdAt          DateTime       @default(now())
+  analysisReport     AnalysisReport @relation(fields: [analysisReportId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisReportId, evidenceId])
+  @@index([researchRunId, evidenceId])
+}
+
+model EvidenceConflict {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  analysisRunId       String                 @db.Uuid
+  topic               String
+  internalEvidenceIds Json                   @default("[]")
+  externalEvidenceIds Json                   @default("[]")
+  description         String
+  resolution          String?
+  status              EvidenceConflictStatus @default(OPEN)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  analysisRun         AnalysisRun            @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, status])
+}
+
+model Experiment {
+  id                    String              @id @default(uuid()) @db.Uuid
+  projectId             String              @db.Uuid
+  createdById           String              @db.Uuid
+  name                  String
+  description           String?
+  status                ExperimentStatus    @default(DRAFT)
+  datasetId             String
+  configuration         Json                @default("{}")
+  bullJobId             String?             @unique
+  cancellationRequested Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  completedAt           DateTime?
+  project               Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy             User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  variants              ExperimentVariant[]
+  cases                 ExperimentCase[]
+  runs                  ExperimentRun[]
+
+  @@index([projectId, status, createdAt])
+}
+
+model ExperimentVariant {
+  id                     String          @id @default(uuid()) @db.Uuid
+  experimentId           String          @db.Uuid
+  name                   String
+  analysisMode           AnalysisMode
+  evidenceMode           EvidenceMode
+  retrievalConfiguration Json            @default("{}")
+  agentConfiguration     Json            @default("{}")
+  criticConfiguration    Json            @default("{}")
+  modelConfiguration     Json            @default("{}")
+  createdAt              DateTime        @default(now())
+  experiment             Experiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  runs                   ExperimentRun[]
+
+  @@unique([experimentId, name])
+}
+
+model ExperimentCase {
+  id               String          @id @default(uuid()) @db.Uuid
+  experimentId     String          @db.Uuid
+  caseIndex        Int
+  title            String
+  question         String
+  objectives       Json            @default("[]")
+  constraints      Json            @default("[]")
+  assumptions      Json            @default("[]")
+  scope            Json            @default("{}")
+  expectedEvidence Json            @default("[]")
+  rubric           Json            @default("{}")
+  createdAt        DateTime        @default(now())
+  experiment       Experiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  runs             ExperimentRun[]
+
+  @@unique([experimentId, caseIndex])
+}
+
+model ExperimentRun {
+  id                  String              @id @default(uuid()) @db.Uuid
+  experimentId        String              @db.Uuid
+  experimentVariantId String              @db.Uuid
+  experimentCaseId    String              @db.Uuid
+  analysisRunId       String?             @db.Uuid
+  repetition          Int
+  status              ExperimentRunStatus @default(QUEUED)
+  seed                Int?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  errorCode           String?
+  createdAt           DateTime            @default(now())
+  experiment          Experiment          @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant             ExperimentVariant   @relation(fields: [experimentVariantId], references: [id], onDelete: Cascade)
+  experimentCase      ExperimentCase      @relation(fields: [experimentCaseId], references: [id], onDelete: Cascade)
+  analysisRun         AnalysisRun?        @relation(fields: [analysisRunId], references: [id], onDelete: SetNull)
+  metrics             ExperimentMetric[]
+  evaluations         HumanEvaluation[]
+
+  @@unique([experimentVariantId, experimentCaseId, repetition])
+  @@index([experimentId, status, createdAt])
+}
+
+model ExperimentMetric {
+  id              String        @id @default(uuid()) @db.Uuid
+  experimentRunId String        @db.Uuid
+  metricName      String
+  metricVersion   String
+  numericValue    Float?
+  textValue       String?
+  metadata        Json          @default("{}")
+  createdAt       DateTime      @default(now())
+  experimentRun   ExperimentRun @relation(fields: [experimentRunId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentRunId, metricName, metricVersion])
+  @@index([metricName, metricVersion])
+}
+
+model HumanEvaluation {
+  id              String        @id @default(uuid()) @db.Uuid
+  experimentRunId String        @db.Uuid
+  evaluatorUserId String        @db.Uuid
+  rubricVersion   String
+  scores          Json
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  experimentRun   ExperimentRun @relation(fields: [experimentRunId], references: [id], onDelete: Cascade)
+  evaluator       User          @relation(fields: [evaluatorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentRunId, evaluatorUserId])
+  @@index([evaluatorUserId, createdAt])
 }
 
 model ProjectMember {

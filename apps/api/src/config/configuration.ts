@@ -25,6 +25,53 @@ export default function configuration() {
       queueName: env.ANALYSIS_QUEUE_NAME,
       rateLimit: env.ANALYSIS_RATE_LIMIT,
     },
+    research: {
+      enabled: env.EXTERNAL_RESEARCH_ENABLED,
+      defaultMode: env.EXTERNAL_RESEARCH_DEFAULT_MODE,
+      provider: env.RESEARCH_PROVIDER,
+      maximumQueries: env.RESEARCH_MAX_QUERIES,
+      maximumResultsPerQuery: env.RESEARCH_RESULTS_PER_QUERY,
+      maximumFetchedPages: env.RESEARCH_MAX_FETCHED_PAGES,
+      maximumPageBytes: env.RESEARCH_MAX_PAGE_BYTES,
+      maximumTotalBytes: env.RESEARCH_MAX_TOTAL_BYTES,
+      maximumRedirects: env.RESEARCH_MAX_REDIRECTS,
+      fetchTimeoutSeconds: env.RESEARCH_FETCH_TIMEOUT_SECONDS,
+      totalTimeoutSeconds: env.RESEARCH_TOTAL_TIMEOUT_SECONDS,
+      maximumContextTokens: env.RESEARCH_MAX_CONTEXT_TOKENS,
+      cacheTtlSeconds: env.RESEARCH_CACHE_TTL_SECONDS,
+      policyVersion: env.RESEARCH_POLICY_VERSION,
+      allowedSchemes: env.RESEARCH_ALLOWED_SCHEMES.split(",").map((value) => value.trim()),
+      allowedContentTypes: env.RESEARCH_ALLOWED_CONTENT_TYPES.split(",").map((value) =>
+        value.trim(),
+      ),
+      blockPrivateNetworks: env.RESEARCH_BLOCK_PRIVATE_NETWORKS,
+      domainAllowlist: env.RESEARCH_DOMAIN_ALLOWLIST.split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      domainDenylist: env.RESEARCH_DOMAIN_DENYLIST.split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      queueName: env.RESEARCH_QUEUE_NAME,
+      queueConcurrency: env.RESEARCH_QUEUE_CONCURRENCY,
+      jobAttempts: env.RESEARCH_JOB_ATTEMPTS,
+      jobTimeoutMs: env.RESEARCH_JOB_TIMEOUT_MS,
+    },
+    experiments: {
+      queueName: env.EXPERIMENT_QUEUE_NAME,
+      queueConcurrency: env.EXPERIMENT_QUEUE_CONCURRENCY,
+      maximumVariants: env.EXPERIMENT_MAX_VARIANTS,
+      maximumCases: env.EXPERIMENT_MAX_CASES,
+      maximumRepetitions: env.EXPERIMENT_MAX_REPETITIONS,
+      maximumRuns: env.EXPERIMENT_MAX_RUNS,
+      jobTimeoutMs: env.EXPERIMENT_JOB_TIMEOUT_MS,
+      maximumEstimatedCost: env.EXPERIMENT_MAX_ESTIMATED_COST,
+      rubricVersion: env.EVALUATION_RUBRIC_VERSION,
+      llmJudge: {
+        enabled: env.EVALUATION_LLM_JUDGE_ENABLED,
+        provider: env.EVALUATION_LLM_JUDGE_PROVIDER,
+        model: env.EVALUATION_LLM_JUDGE_MODEL,
+      },
+    },
     aiService: {
       ingestionSecret: env.INGESTION_INTERNAL_SECRET,
       ingestionTimeoutMs: env.INGESTION_TIMEOUT_MS,

@@ -13,7 +13,7 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 
 import type {
@@ -32,6 +32,7 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RefreshTokenService } from "./services/refresh-token.service";
 
 @Controller("auth")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 export class AuthController {
   constructor(
     @Inject(AuthService) private readonly authService: AuthService,
@@ -41,6 +42,7 @@ export class AuthController {
   ) {}
 
   @Post("register")
+  @SkipThrottle({ authLogin: true, authRefresh: true, authRegister: false })
   @Throttle({ authRegister: {} })
   async register(
     @Body() body: RegisterDto,
@@ -52,6 +54,7 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(200)
+  @SkipThrottle({ authLogin: false, authRefresh: true, authRegister: true })
   @Throttle({ authLogin: {} })
   async login(
     @Body() body: LoginDto,
@@ -63,6 +66,7 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(200)
+  @SkipThrottle({ authLogin: true, authRefresh: false, authRegister: true })
   @Throttle({ authRefresh: {} })
   async refresh(
     @Req() request: Request,

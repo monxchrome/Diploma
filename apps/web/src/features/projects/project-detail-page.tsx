@@ -150,13 +150,22 @@ export function ProjectDetailPage({ projectId }: Readonly<{ projectId: string }>
               ) : null}
             </div>
 
-            <nav aria-label="Project sections" className="flex flex-wrap gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+            <nav
+              aria-label="Project sections"
+              className="flex flex-wrap gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-sm"
+            >
               <Link
                 className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
                 href={`/projects/${projectId}/analyses`}
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 Analyses
+              </Link>
+              <Link
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-teal-200 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+                href={`/projects/${projectId}/experiments`}
+              >
+                Experiments
               </Link>
             </nav>
 

@@ -173,7 +173,8 @@ describe("project pages", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Quality gate warning");
     expect(screen.getByText("Completed with limitations")).toBeInTheDocument();
-    expect(screen.getByText("Quality: 25%")).toBeInTheDocument();
+    expect(screen.getByText("Report quality: 25%")).toBeInTheDocument();
+    expect(screen.getByText("No internal knowledge base selected")).toBeInTheDocument();
   });
 });
 

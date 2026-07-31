@@ -20,11 +20,14 @@ import { UsersModule } from "./modules/users/users.module";
 import { KnowledgeBasesModule } from "./modules/knowledge-bases/knowledge-bases.module";
 import { RetrievalModule } from "./modules/retrieval/retrieval.module";
 import { AnalysesModule } from "./modules/analyses/analyses.module";
+import { ResearchModule } from "./modules/research/research.module";
+import { ExperimentsModule } from "./modules/experiments/experiments.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       cache: true,
+      envFilePath: [".env", "../../.env"],
       isGlobal: true,
       load: [configuration],
       validate: validateApiEnv,
@@ -87,6 +90,8 @@ import { AnalysesModule } from "./modules/analyses/analyses.module";
     KnowledgeBasesModule,
     RetrievalModule,
     AnalysesModule,
+    ResearchModule,
+    ExperimentsModule,
     HealthModule,
     SystemModule,
   ],

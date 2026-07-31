@@ -12,6 +12,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 
 import { getRequestId } from "../../common/logging/request-id";
@@ -27,6 +28,7 @@ import { UpdateKnowledgeBaseDto } from "./dto/update-knowledge-base.dto";
 import { KnowledgeBasesService } from "./knowledge-bases.service";
 
 @Controller("projects/:projectId/knowledge-bases")
+@SkipThrottle({ authLogin: true, authRefresh: true, authRegister: true })
 @UseGuards(JwtAuthGuard, ProjectAccessGuard)
 export class KnowledgeBasesController {
   constructor(@Inject(KnowledgeBasesService) private readonly service: KnowledgeBasesService) {}
@@ -54,6 +56,12 @@ export class KnowledgeBasesController {
     @Param("knowledgeBaseId", ParseUUIDPipe) id: string,
   ) {
     return this.service.get(projectId, id);
+  }
+  @Get(":knowledgeBaseId/documents") documents(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("knowledgeBaseId", ParseUUIDPipe) knowledgeBaseId: string,
+  ) {
+    return this.service.listDocuments(projectId, knowledgeBaseId);
   }
   @Patch(":knowledgeBaseId") update(
     @CurrentProjectAccess() access: ProjectAccess,
@@ -131,5 +139,13 @@ export class KnowledgeBasesController {
     @Param("documentId", ParseUUIDPipe) documentId: string,
   ) {
     return this.service.getDocument(projectId, knowledgeBaseId, documentId);
+  }
+  @Delete(":knowledgeBaseId/documents/:documentId") deleteDocument(
+    @CurrentProjectAccess() access: ProjectAccess,
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("knowledgeBaseId", ParseUUIDPipe) knowledgeBaseId: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ) {
+    return this.service.archiveDocument({ documentId, knowledgeBaseId, projectId, role: access.role });
   }
 }
