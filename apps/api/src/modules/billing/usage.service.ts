@@ -26,7 +26,17 @@ export type UsageMetric =
   | "monthlyExperimentRuns"
   | "monthlyFetchedExternalPages"
   | "monthlyMultiAgentRuns"
-  | "monthlySingleAgentRuns";
+  | "monthlySingleAgentRuns"
+  | "reportPdfExports"
+  | "reportDocxExports"
+  | "reportMarkdownExports"
+  | "reportCopyMarkdown"
+  | "reportShareLinksCreated"
+  | "reportShareViews"
+  | "reportCommentsCreated"
+  | "reportVersionComparisons"
+  | "exportArtifactBytesStored"
+  | "exportArtifactBytesDeleted";
 
 export type UsageInput = {
   billingPeriod?: string;

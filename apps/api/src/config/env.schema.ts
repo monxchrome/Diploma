@@ -135,7 +135,7 @@ export const ApiEnvSchema = z
     BILLING_ENABLED: TrueBooleanStringSchema,
     BILLING_FAKE_PROVIDER_ENABLED: TrueBooleanStringSchema,
     BILLING_FAKE_WEBHOOK_SECRET: z.string().min(32).default(DEFAULT_FAKE_BILLING_SECRET),
-    BILLING_PLAN_CATALOG_VERSION: z.string().min(1).max(100).default("phase-8-v1"),
+    BILLING_PLAN_CATALOG_VERSION: z.string().min(1).max(100).default("phase-10-v1"),
     BILLING_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
     BODY_LIMIT: z.string().default("1mb"),
     BULLMQ_CONNECTION_URL: z.string().url().default("redis://localhost:6379/1"),
@@ -177,6 +177,66 @@ export const ApiEnvSchema = z
     RATE_LIMIT_UPLOAD_PER_HOUR: z.coerce.number().int().positive().default(30),
     RATE_LIMIT_WEBHOOK_PER_MINUTE: z.coerce.number().int().positive().default(120),
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+    REPORT_SNAPSHOT_ENABLED: TrueBooleanStringSchema,
+    REPORT_SNAPSHOT_SCHEMA_VERSION: z.string().min(1).max(100).default("phase-10-v1"),
+    REPORT_EXPORT_ENABLED: TrueBooleanStringSchema,
+    REPORT_EXPORT_QUEUE_NAME: z.string().min(1).max(100).default("report-export"),
+    REPORT_EXPORT_MAX_CONCURRENCY: z.coerce.number().int().positive().max(10).default(2),
+    REPORT_EXPORT_MAX_INPUT_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(20_000_000)
+      .default(1_000_000),
+    REPORT_EXPORT_MAX_ARTIFACT_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100_000_000)
+      .default(10_000_000),
+    REPORT_EXPORT_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(60),
+    REPORT_EXPORT_RETENTION_DAYS: z.coerce.number().int().positive().max(3650).default(30),
+    REPORT_EXPORT_TEMP_DIRECTORY: z.string().min(1).max(500).default("/tmp/dip-exports"),
+    REPORT_EXPORT_TEMPLATE_VERSION: z.string().min(1).max(100).default("phase-10-v1"),
+    REPORT_EXPORT_PDF_ENABLED: TrueBooleanStringSchema,
+    REPORT_EXPORT_DOCX_ENABLED: TrueBooleanStringSchema,
+    REPORT_EXPORT_MARKDOWN_ENABLED: TrueBooleanStringSchema,
+    REPORT_EXPORT_REMOTE_ASSETS_ENABLED: BooleanStringSchema,
+    REPORT_EXPORT_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("dip-documents"),
+    REPORT_EXPORT_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+    REPORT_SHARE_ENABLED: TrueBooleanStringSchema,
+    REPORT_SHARE_PUBLIC_ENABLED: TrueBooleanStringSchema,
+    REPORT_SHARE_TOKEN_BYTES: z.coerce.number().int().min(24).max(64).default(32),
+    REPORT_SHARE_DEFAULT_EXPIRY_DAYS: z.coerce.number().int().positive().max(365).default(7),
+    REPORT_SHARE_MAX_EXPIRY_DAYS: z.coerce.number().int().positive().max(3650).default(30),
+    REPORT_SHARE_NO_EXPIRY_ENABLED: BooleanStringSchema,
+    REPORT_SHARE_MAX_FAILED_ATTEMPTS: z.coerce.number().int().positive().max(100).default(10),
+    REPORT_SHARE_ACCESS_SESSION_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(86_400)
+      .default(3600),
+    REPORT_SHARE_VIEW_COUNT_ENABLED: TrueBooleanStringSchema,
+    REPORT_COMMENTS_ENABLED: TrueBooleanStringSchema,
+    REPORT_COMMENT_MAX_LENGTH: z.coerce.number().int().min(100).max(10_000).default(4_000),
+    REPORT_COMMENT_MAX_MENTIONS: z.coerce.number().int().min(1).max(20).default(10),
+    REPORT_COMMENT_RATE_LIMIT: z.coerce.number().int().positive().max(100).default(20),
+    COLLABORATION_NOTIFICATIONS_ENABLED: TrueBooleanStringSchema,
+    COLLABORATION_REALTIME_ENABLED: BooleanStringSchema,
+    REPORT_BRANDING_ENABLED: TrueBooleanStringSchema,
+    REPORT_BRANDING_LOGO_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(10_000_000)
+      .default(2_000_000),
+    REPORT_BRANDING_LOGO_MAX_WIDTH: z.coerce.number().int().positive().max(10_000).default(2_000),
+    REPORT_BRANDING_LOGO_MAX_HEIGHT: z.coerce.number().int().positive().max(10_000).default(2_000),
+    REPORT_BRANDING_SAFE_SVG_ENABLED: BooleanStringSchema,
     REDIS_URL: z.string().url().default("redis://localhost:6379/0"),
     MINIO_ACCESS_KEY: z.string().min(3).default("dip_minio"),
     MINIO_BUCKET: z

@@ -24,6 +24,7 @@ import { AnalysesModule } from "./modules/analyses/analyses.module";
 import { ResearchModule } from "./modules/research/research.module";
 import { ExperimentsModule } from "./modules/experiments/experiments.module";
 import { BillingModule } from "./modules/billing/billing.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { BillingModule } from "./modules/billing/billing.module";
     ResearchModule,
     ExperimentsModule,
     BillingModule,
+    ReportsModule,
     HealthModule,
     SystemModule,
   ],

@@ -8,6 +8,7 @@ import { BillingModule } from "../billing/billing.module";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ProjectAccessGuard } from "../projects/guards/project-access.guard";
 import { ResearchModule } from "../research/research.module";
+import { ReportsModule } from "../reports/reports.module";
 import { AnalysesController } from "./analyses.controller";
 import { AnalysesProcessor } from "./analyses.processor";
 import { AnalysesService } from "./analyses.service";
@@ -21,6 +22,7 @@ import { AnalysesService } from "./analyses.service";
     DatabaseModule,
     HttpClientModule,
     ResearchModule,
+    ReportsModule,
   ],
   providers: [AnalysesProcessor, AnalysesService, JwtAuthGuard, ProjectAccessGuard],
 })

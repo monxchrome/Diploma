@@ -18,6 +18,8 @@ Phase 6 adds controlled, explicitly enabled external research and a scientific e
 
 Phase 9 adds a conversation-first product surface. After authentication, users land on Home, ask a decision question in one composer, optionally add project sources, and press Analyze. The existing APIs, project authorization, evidence modes, billing and execution engine remain unchanged. See [Phase 9 architecture](docs/architecture/phase-9.md) and the [UX documentation](docs/ux).
 
+Phase 10 adds immutable report versions created after successful analysis runs. Export, printing and sharing operate only on a server-sanitized `ReportSnapshot`, never the mutable report UI. PDF, DOCX and Markdown exports are queued and stored privately; share links use hash-only CSPRNG tokens, may expire or be revoked, and public payloads omit private source and system metadata. See [Phase 10 architecture](docs/architecture/phase-10.md).
+
 ## Architecture
 
 ```text
@@ -174,7 +176,7 @@ Advanced contains the friendly approach selector and an explicit, entitlement-aw
 
 The sidebar supports collapse, keyboard navigation and a mobile drawer. Use `Ctrl+K` / `Cmd+K` to open search. New controls expose visible focus styling, system light/dark tokens and reduced-motion behavior. See the [accessibility guide](docs/ux/accessibility.md) and [responsive design guide](docs/ux/responsive-design.md).
 
-Known Phase 9 limitations: it does not change model quality; conversational follow-up remains limited by the existing analysis model; public sharing, comments, mentions, PDF/DOCX export, notification center, mobile apps, offline-first behavior and a user prompt library are not implemented. Technical pages remain available to power users. Phase 10–12 are not part of this repository change.
+Known Phase 10 limitations: password-protected links, email delivery, realtime collaborative editing, arbitrary report HTML/CSS, custom JavaScript, public report search and external logo processing are intentionally not implemented. Phase 11–12 are not part of this repository change.
 
 Auth and project API routes:
 
@@ -204,6 +206,13 @@ GET    /api/projects/:projectId/analyses
 GET    /api/projects/:projectId/analyses/:analysisId
 POST   /api/projects/:projectId/analyses/:analysisId/run
 POST   /api/projects/:projectId/analyses/:analysisId/cancel
+GET    /api/projects/:projectId/reports/:lineageId/versions
+GET    /api/report-snapshots/:snapshotId
+POST   /api/report-snapshots/:snapshotId/publish
+POST   /api/report-snapshots/:snapshotId/exports
+POST   /api/report-snapshots/:snapshotId/share-links
+GET    /api/exports/:exportJobId/download
+GET    /api/public/shared/:token
 GET    /api/projects/:projectId/research/policy
 GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research
 GET    /api/projects/:projectId/analyses/:analysisId/runs/:runId/research/queries

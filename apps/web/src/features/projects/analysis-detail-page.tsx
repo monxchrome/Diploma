@@ -19,6 +19,8 @@ import { type ReactNode, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-provider";
 
+import { ReportActions } from "./report-actions";
+
 import {
   cancelAnalysis,
   fetchAnalysis,
@@ -187,7 +189,9 @@ function AnalysisViewPage({
           run={run}
         />
       ) : null}
-      {view === "report" ? <ReportView analysis={analysis} run={run} /> : null}
+      {view === "report" ? (
+        <ReportView analysis={analysis} apiRequest={apiRequest} run={run} />
+      ) : null}
       {view === "overview" ? <OverviewView analysis={analysis} run={run} /> : null}
       {view === "agents" ? (
         <TechnicalRunView
@@ -239,7 +243,15 @@ function AnalysisViewPage({
   );
 }
 
-function ReportView({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
+function ReportView({
+  analysis,
+  apiRequest,
+  run,
+}: Readonly<{
+  analysis: AnalysisDetail;
+  apiRequest: ReturnType<typeof useAuth>["apiRequest"];
+  run?: AnalysisRun;
+}>) {
   const [citation, setCitation] = useState<Citation | null>(null);
   const citationOpenerRef = useRef<HTMLButtonElement | null>(null);
   const closeCitation = () => {
@@ -276,6 +288,7 @@ function ReportView({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?
   const citations = toCitations(run);
   return (
     <div className="grid gap-6">
+      <ReportActions apiRequest={apiRequest} snapshot={run.reportSnapshot} />
       {limited ? (
         <section
           className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"

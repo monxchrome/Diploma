@@ -26,6 +26,7 @@ import { AuditService } from "../audit/audit.service";
 import { QuotaService } from "../billing/quota.service";
 import { canUpdateProject } from "../projects/project-permissions";
 import { ResearchService } from "../research/research.service";
+import { ReportsService } from "../reports/reports.service";
 
 const ACTIVE = [AnalysisStatus.QUEUED, AnalysisStatus.RUNNING];
 
@@ -66,6 +67,7 @@ export class AnalysesService {
     @InjectQueue("analysis") private readonly queue: Queue,
     @Inject(ResearchService) private readonly research: ResearchService,
     @Inject(QuotaService) private readonly quota: QuotaService,
+    @Inject(ReportsService) private readonly reports: ReportsService,
   ) {}
 
   async create(input: {
@@ -134,6 +136,15 @@ export class AnalysesService {
           include: {
             agentRuns: true,
             report: { include: { citations: true, externalCitations: true } },
+            reportSnapshot: {
+              select: {
+                contentHash: true,
+                id: true,
+                reportLineageId: true,
+                status: true,
+                versionNumber: true,
+              },
+            },
           },
         },
       },
@@ -565,6 +576,7 @@ export class AnalysesService {
             update: { graphVersion: run.graphVersion, state: { stage: nodeName } },
           });
       });
+      await this.reports.ensureSnapshotForCompletedRun({ requestId, runId: run.id });
       await this.quota.finalizeReservation({
         event: {
           eventType: "monthlyAnalysisRuns",

@@ -114,6 +114,15 @@ export class QuotaService {
       | "experimentJsonExportAvailable"
       | "experimentsAvailable"
       | "externalResearchAvailable"
+      | "reportPdfExportAvailable"
+      | "reportDocxExportAvailable"
+      | "reportMarkdownExportAvailable"
+      | "publicSharingAvailable"
+      | "authenticatedSharingAvailable"
+      | "collaborationCommentsAvailable"
+      | "customBrandingAvailable"
+      | "externalCommentingAvailable"
+      | "versionComparisonAvailable"
     >;
     projectId?: string;
     userId: string;
@@ -136,6 +145,9 @@ export class QuotaService {
       | "maximumMembersPerProject"
       | "maximumOwnedProjects"
       | "maximumTotalDocuments"
+      | "maximumActiveShareLinks"
+      | "maximumExportArtifactsPerPeriod"
+      | "maximumBrandProfiles"
     >;
     projectId?: string;
     userId: string;

@@ -193,6 +193,61 @@ enum BillingCheckoutStatus {
   EXPIRED
 }
 
+enum ReportSnapshotStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExportFormat {
+  PDF
+  DOCX
+  MARKDOWN
+  PRINT_HTML
+}
+
+enum ExportJobStatus {
+  QUEUED
+  GENERATING
+  VALIDATING
+  UPLOADING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum ShareAccessMode {
+  PUBLIC_READ_ONLY
+  AUTHENTICATED_READ_ONLY
+  PROJECT_MEMBERS_ONLY
+  AUTHENTICATED_COMMENT
+}
+
+enum CommentTargetType {
+  REPORT_GENERAL
+  REPORT_SECTION
+  CITATION
+  EVIDENCE_SUMMARY
+}
+
+enum CommentThreadStatus {
+  OPEN
+  RESOLVED
+  DELETED
+}
+
+enum CollaborationNotificationType {
+  MENTIONED_IN_COMMENT
+  REPLIED_TO_COMMENT
+  THREAD_RESOLVED
+  THREAD_REOPENED
+  EXPORT_COMPLETED
+  EXPORT_FAILED
+  SHARE_LINK_CREATED
+  SHARE_LINK_REVOKED
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -370,27 +425,42 @@ model EntitlementOverride {
 }
 
 model User {
-  id                    String             @id @default(uuid()) @db.Uuid
-  email                 String             @unique
+  id                    String                      @id @default(uuid()) @db.Uuid
+  email                 String                      @unique
   passwordHash          String
   displayName           String
-  globalRole            GlobalRole         @default(USER)
-  status                UserStatus         @default(ACTIVE)
+  globalRole            GlobalRole                  @default(USER)
+  status                UserStatus                  @default(ACTIVE)
   emailVerifiedAt       DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
   sessions              AuthSession[]
-  ownedProjects         Project[]          @relation("ProjectOwner")
+  ownedProjects         Project[]                   @relation("ProjectOwner")
   memberships           ProjectMember[]
-  auditLogs             AuditLog[]         @relation("AuditLogActor")
-  knowledgeBases        KnowledgeBase[]    @relation("KnowledgeBaseCreator")
-  documents             Document[]         @relation("DocumentCreator")
+  auditLogs             AuditLog[]                  @relation("AuditLogActor")
+  knowledgeBases        KnowledgeBase[]             @relation("KnowledgeBaseCreator")
+  documents             Document[]                  @relation("DocumentCreator")
   retrievalRuns         RetrievalRun[]
   answerFeedback        AnswerFeedback[]
   analyses              DecisionAnalysis[]
   analysisRuns          AnalysisRun[]
   experiments           Experiment[]
   experimentEvaluations HumanEvaluation[]
+  reportLineages        ReportLineage[]             @relation("ReportLineageCreator")
+  reportSnapshots       ReportSnapshot[]            @relation("ReportSnapshotCreator")
+  exportJobs            ExportJob[]                 @relation("ExportJobRequester")
+  exportArtifacts       ExportArtifact[]            @relation("ExportArtifactOwner")
+  shareLinks            ShareLink[]                 @relation("ShareLinkCreator")
+  revokedShareLinks     ShareLink[]                 @relation("ShareLinkRevoker")
+  commentThreads        CommentThread[]             @relation("CommentThreadCreator")
+  comments              Comment[]                   @relation("CommentAuthor")
+  deletedComments       Comment[]                   @relation("CommentDeleter")
+  mentionsCreated       Mention[]                   @relation("MentionCreator")
+  mentionsReceived      Mention[]                   @relation("MentionRecipient")
+  notificationsReceived CollaborationNotification[] @relation("NotificationRecipient")
+  notificationsActed    CollaborationNotification[] @relation("NotificationActor")
+  brandProfiles         BrandProfile[]
+  selectedBrandProfiles ProjectBrandProfile[]       @relation("ProjectBrandSelector")
 }
 
 model AuthSession {
@@ -413,23 +483,28 @@ model AuthSession {
 }
 
 model Project {
-  id             String             @id @default(uuid()) @db.Uuid
-  ownerId        String             @db.Uuid
-  name           String
-  description    String?
-  settings       Json               @default("{}")
-  archivedAt     DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  owner          User               @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members        ProjectMember[]
-  auditLogs      AuditLog[]
-  knowledgeBases KnowledgeBase[]
-  retrievalRuns  RetrievalRun[]
-  analyses       DecisionAnalysis[]
-  analysisRuns   AnalysisRun[]
-  researchRuns   ResearchRun[]
-  experiments    Experiment[]
+  id              String               @id @default(uuid()) @db.Uuid
+  ownerId         String               @db.Uuid
+  name            String
+  description     String?
+  settings        Json                 @default("{}")
+  archivedAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  owner           User                 @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members         ProjectMember[]
+  auditLogs       AuditLog[]
+  knowledgeBases  KnowledgeBase[]
+  retrievalRuns   RetrievalRun[]
+  analyses        DecisionAnalysis[]
+  analysisRuns    AnalysisRun[]
+  researchRuns    ResearchRun[]
+  experiments     Experiment[]
+  reportLineages  ReportLineage[]
+  reportSnapshots ReportSnapshot[]
+  shareLinks      ShareLink[]
+  commentThreads  CommentThread[]
+  brandProfile    ProjectBrandProfile?
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -682,6 +757,7 @@ model AnalysisRun {
   researchRun           ResearchRun?
   evidenceConflicts     EvidenceConflict[]
   experimentRuns        ExperimentRun[]
+  reportSnapshot        ReportSnapshot?
 
   @@index([analysisId, createdAt])
   @@index([projectId, status, createdAt])
@@ -1070,4 +1146,281 @@ model AuditLog {
   @@index([projectId, createdAt])
   @@index([action, createdAt])
   @@index([requestId])
+}
+
+model ReportLineage {
+  id             String           @id @default(uuid()) @db.Uuid
+  projectId      String           @db.Uuid
+  rootAnalysisId String           @db.Uuid
+  createdById    String           @db.Uuid
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy      User             @relation("ReportLineageCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  snapshots      ReportSnapshot[]
+
+  @@unique([projectId, rootAnalysisId])
+  @@index([projectId])
+  @@index([rootAnalysisId])
+}
+
+model ReportSnapshot {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  reportLineageId      String                 @db.Uuid
+  analysisId           String                 @unique @db.Uuid
+  projectId            String                 @db.Uuid
+  createdById          String                 @db.Uuid
+  previousSnapshotId   String?                @db.Uuid
+  versionNumber        Int
+  schemaVersion        String
+  status               ReportSnapshotStatus   @default(DRAFT)
+  title                String
+  userQuestion         String
+  content              Json
+  contentHash          String
+  sanitizationWarnings Json                   @default("[]")
+  publishedAt          DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  lineage              ReportLineage          @relation(fields: [reportLineageId], references: [id], onDelete: Cascade)
+  analysisRun          AnalysisRun            @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy            User                   @relation("ReportSnapshotCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  previousSnapshot     ReportSnapshot?        @relation("SnapshotPredecessor", fields: [previousSnapshotId], references: [id], onDelete: SetNull)
+  nextSnapshots        ReportSnapshot[]       @relation("SnapshotPredecessor")
+  sources              ReportSnapshotSource[]
+  exportJobs           ExportJob[]
+  shareLinks           ShareLink[]
+  commentThreads       CommentThread[]
+
+  @@unique([reportLineageId, versionNumber])
+  @@index([projectId])
+  @@index([status])
+  @@index([contentHash])
+  @@index([createdAt])
+}
+
+model ReportSnapshotSource {
+  id              String         @id @default(uuid()) @db.Uuid
+  snapshotId      String         @db.Uuid
+  evidenceId      String
+  sourceType      String
+  title           String
+  safeUrl         String?
+  excerpt         String?
+  pageNumber      Int?
+  publicationDate DateTime?
+  retrievalDate   DateTime?
+  warningCode     String?
+  metadata        Json           @default("{}")
+  snapshot        ReportSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, evidenceId])
+  @@index([snapshotId])
+}
+
+model ExportJob {
+  id                   String          @id @default(uuid()) @db.Uuid
+  snapshotId           String          @db.Uuid
+  requestedById        String          @db.Uuid
+  format               ExportFormat
+  status               ExportJobStatus @default(QUEUED)
+  options              Json            @default("{}")
+  templateVersion      String
+  brandingSnapshotHash String?
+  idempotencyKey       String          @unique
+  progressStage        String?
+  failureCode          String?
+  failureMessage       String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  snapshot             ReportSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  requestedBy          User            @relation("ExportJobRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  artifact             ExportArtifact?
+
+  @@index([snapshotId])
+  @@index([requestedById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ExportArtifact {
+  id          String       @id @default(uuid()) @db.Uuid
+  exportJobId String       @unique @db.Uuid
+  snapshotId  String       @db.Uuid
+  ownerUserId String       @db.Uuid
+  format      ExportFormat
+  objectKey   String
+  fileName    String
+  contentType String
+  byteSize    Int
+  checksum    String
+  expiresAt   DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  exportJob   ExportJob    @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+  ownerUser   User         @relation("ExportArtifactOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@index([snapshotId])
+  @@index([ownerUserId])
+  @@index([expiresAt])
+}
+
+model ShareLink {
+  id                    String          @id @default(uuid()) @db.Uuid
+  snapshotId            String          @db.Uuid
+  projectId             String          @db.Uuid
+  createdById           String          @db.Uuid
+  tokenHash             String          @unique
+  tokenPrefix           String
+  accessMode            ShareAccessMode
+  expiresAt             DateTime?
+  revokedAt             DateTime?
+  revokedById           String?         @db.Uuid
+  allowDownload         Boolean         @default(false)
+  allowPdfExport        Boolean         @default(false)
+  allowDocxExport       Boolean         @default(false)
+  allowMarkdownExport   Boolean         @default(false)
+  allowComments         Boolean         @default(false)
+  showSources           Boolean         @default(true)
+  showTechnicalAppendix Boolean         @default(false)
+  showBranding          Boolean         @default(true)
+  maximumViews          Int?
+  currentViewCount      Int             @default(0)
+  lastAccessedAt        DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  snapshot              ReportSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  project               Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy             User            @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy             User?           @relation("ShareLinkRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([projectId])
+  @@index([createdById])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([tokenPrefix])
+}
+
+model CommentThread {
+  id           String              @id @default(uuid()) @db.Uuid
+  snapshotId   String              @db.Uuid
+  projectId    String              @db.Uuid
+  targetType   CommentTargetType
+  targetAnchor String
+  createdById  String              @db.Uuid
+  status       CommentThreadStatus @default(OPEN)
+  resolvedById String?             @db.Uuid
+  resolvedAt   DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  snapshot     ReportSnapshot      @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User                @relation("CommentThreadCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  comments     Comment[]
+
+  @@index([snapshotId])
+  @@index([projectId])
+  @@index([targetType, targetAnchor])
+  @@index([status])
+}
+
+model Comment {
+  id             String        @id @default(uuid()) @db.Uuid
+  threadId       String        @db.Uuid
+  authorUserId   String        @db.Uuid
+  body           String
+  bodyFormat     String        @default("PLAIN_TEXT")
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  deletedById    String?       @db.Uuid
+  deletionReason String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  thread         CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author         User          @relation("CommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  deletedBy      User?         @relation("CommentDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  mentions       Mention[]
+
+  @@index([threadId])
+  @@index([authorUserId])
+  @@index([createdAt])
+}
+
+model Mention {
+  id              String   @id @default(uuid()) @db.Uuid
+  commentId       String   @db.Uuid
+  mentionedUserId String   @db.Uuid
+  createdById     String   @db.Uuid
+  createdAt       DateTime @default(now())
+  comment         Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedUser   User     @relation("MentionRecipient", fields: [mentionedUserId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("MentionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, mentionedUserId])
+}
+
+model CollaborationNotification {
+  id              String                        @id @default(uuid()) @db.Uuid
+  recipientUserId String                        @db.Uuid
+  actorUserId     String?                       @db.Uuid
+  type            CollaborationNotificationType
+  projectId       String?                       @db.Uuid
+  snapshotId      String?                       @db.Uuid
+  threadId        String?                       @db.Uuid
+  commentId       String?                       @db.Uuid
+  exportJobId     String?                       @db.Uuid
+  metadata        Json                          @default("{}")
+  readAt          DateTime?
+  createdAt       DateTime                      @default(now())
+  recipient       User                          @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  actor           User?                         @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientUserId, createdAt])
+}
+
+model BrandProfile {
+  id                      String                @id @default(uuid()) @db.Uuid
+  ownerUserId             String                @db.Uuid
+  displayName             String
+  legalName               String?
+  logoObjectKey           String?
+  logoChecksum            String?
+  accentColor             String
+  secondaryColor          String?
+  footerText              String?
+  disclaimer              String?
+  websiteUrl              String?
+  contactEmail            String?
+  confidentialityLabel    String?
+  showPlatformAttribution Boolean               @default(true)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  owner                   User                  @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  projectSelections       ProjectBrandProfile[]
+
+  @@index([ownerUserId])
+  @@index([createdAt])
+}
+
+model ProjectBrandProfile {
+  projectId      String       @id @db.Uuid
+  brandProfileId String       @db.Uuid
+  selectedById   String       @db.Uuid
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  selectedBy     User         @relation("ProjectBrandSelector", fields: [selectedById], references: [id], onDelete: Restrict)
+
+  @@index([brandProfileId])
 }

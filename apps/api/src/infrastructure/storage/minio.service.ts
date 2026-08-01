@@ -24,6 +24,27 @@ export class MinioService {
     return { contentLength: Number(response.headers.get("content-length") ?? -1) };
   }
 
+  async putObject(input: {
+    body: Buffer;
+    bucket?: string;
+    contentType: string;
+    key: string;
+  }): Promise<void> {
+    const url = this.objectUrl(input.key, input.bucket);
+    const payloadHash = createHash("sha256").update(input.body).digest("hex");
+    const headers = {
+      ...this.signHeaders("PUT", url, payloadHash),
+      "content-length": String(input.body.length),
+      "content-type": input.contentType,
+    };
+    const response = await fetch(url, {
+      body: input.body as unknown as BodyInit,
+      headers,
+      method: "PUT",
+    });
+    if (!response.ok) throw new ServiceUnavailableException("Object storage is unavailable");
+  }
+
   async removeObject(key: string): Promise<void> {
     const url = this.objectUrl(key);
     const headers = this.signHeaders("DELETE", url, "UNSIGNED-PAYLOAD");
@@ -63,9 +84,43 @@ export class MinioService {
     return { expiresAt, requiredHeaders, uploadUrl: url.toString() };
   }
 
-  private objectUrl(key: string): string {
+  createDownloadUrl(
+    key: string,
+    bucket?: string,
+    ttlSeconds?: number,
+  ): { expiresAt: Date; url: string } {
+    const expiresIn = ttlSeconds ?? this.config.getOrThrow<number>("storage.presignTtlSeconds");
+    const expiresAt = new Date(Date.now() + expiresIn * 1000);
+    const url = new URL(this.objectUrl(key, bucket));
+    const now = new Date();
+    const amzDate = formatAmzDate(now);
+    const dateStamp = amzDate.slice(0, 8);
+    const scope = `${dateStamp}/${region}/${service}/aws4_request`;
+    const credential = `${this.config.getOrThrow<string>("storage.accessKey")}/${scope}`;
+    url.searchParams.set("X-Amz-Algorithm", algorithm);
+    url.searchParams.set("X-Amz-Credential", credential);
+    url.searchParams.set("X-Amz-Date", amzDate);
+    url.searchParams.set("X-Amz-Expires", String(expiresIn));
+    url.searchParams.set("X-Amz-SignedHeaders", "host");
+    const canonicalRequest = [
+      "GET",
+      url.pathname,
+      canonicalQuery(url),
+      `host:${url.host}\n`,
+      "host",
+      "UNSIGNED-PAYLOAD",
+    ].join("\n");
+    url.searchParams.set(
+      "X-Amz-Signature",
+      this.signature(dateStamp, scope, canonicalRequest, amzDate),
+    );
+    return { expiresAt, url: url.toString() };
+  }
+
+  private objectUrl(key: string, bucket?: string): string {
     const endpoint = this.config.getOrThrow<string>("storage.endpoint").replace(/\/$/, "");
-    return `${endpoint}/${this.config.getOrThrow<string>("storage.bucket")}/${key.split("/").map(encodeURIComponent).join("/")}`;
+    const resolvedBucket = bucket ?? this.config.getOrThrow<string>("storage.bucket");
+    return `${endpoint}/${resolvedBucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
   }
 
   private signHeaders(method: string, rawUrl: string, payloadHash: string): Record<string, string> {

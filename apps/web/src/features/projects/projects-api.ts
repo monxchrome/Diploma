@@ -57,6 +57,16 @@ export const AnalysisRunSchema = z
       })
       .nullable()
       .optional(),
+    reportSnapshot: z
+      .object({
+        contentHash: z.string().length(64),
+        id: z.string().uuid(),
+        reportLineageId: z.string().uuid(),
+        status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
+        versionNumber: z.number().int().positive(),
+      })
+      .nullable()
+      .optional(),
   })
   .passthrough();
 

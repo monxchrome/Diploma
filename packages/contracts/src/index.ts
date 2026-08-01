@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./reports.js";
+
 export const ServiceStatusSchema = z.enum(["ok", "degraded", "down"]);
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
 
@@ -936,6 +938,20 @@ export const PlanEntitlementsSchema = z.object({
   maximumRetentionDays: BillingLimitSchema.nullable(),
   priorityQueue: z.boolean(),
   supportLevel: z.enum(["community", "standard", "priority"]),
+  reportPdfExportAvailable: z.boolean().default(false),
+  reportDocxExportAvailable: z.boolean().default(false),
+  reportMarkdownExportAvailable: z.boolean().default(false),
+  publicSharingAvailable: z.boolean().default(false),
+  authenticatedSharingAvailable: z.boolean().default(false),
+  collaborationCommentsAvailable: z.boolean().default(false),
+  customBrandingAvailable: z.boolean().default(false),
+  maximumActiveShareLinks: BillingLimitSchema.default(0),
+  maximumExportArtifactsPerPeriod: BillingLimitSchema.default(0),
+  maximumBrandProfiles: BillingLimitSchema.default(0),
+  shareLinkMaximumExpiryDays: BillingLimitSchema.default(0),
+  shareLinkNoExpiryAvailable: z.boolean().default(false),
+  externalCommentingAvailable: z.boolean().default(false),
+  versionComparisonAvailable: z.boolean().default(false),
 });
 export type PlanEntitlements = z.infer<typeof PlanEntitlementsSchema>;
 
