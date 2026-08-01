@@ -1,8 +1,8 @@
-import { AnalysisFormPage } from "@/features/projects/analysis-form-page";
+import { redirect } from "next/navigation";
 
 export default async function Page({
   params,
 }: Readonly<{ params: Promise<{ projectId: string }> }>) {
   const { projectId } = await params;
-  return <AnalysisFormPage projectId={projectId} />;
+  redirect(`/home?project=${projectId}#composer`);
 }

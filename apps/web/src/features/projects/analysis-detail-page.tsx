@@ -1,14 +1,26 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, Bot, FileCheck2, Play, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  CircleAlert,
+  Clock3,
+  FileText,
+  Play,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { type ReactNode, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-provider";
 
 import {
+  cancelAnalysis,
   fetchAnalysis,
   fetchAnalysisResearch,
   fetchAnalysisResearchConflicts,
@@ -22,11 +34,13 @@ import {
 type AnalysisView =
   "overview" | "progress" | "agents" | "research" | "sources" | "conflicts" | "report";
 
+type Citation = { evidenceId: string; quote: string; type: "external" | "project" };
+
 export function AnalysisDetailPage({
   projectId,
   analysisId,
 }: Readonly<{ projectId: string; analysisId: string }>) {
-  return <AnalysisViewPage analysisId={analysisId} projectId={projectId} view="overview" />;
+  return <AnalysisViewPage analysisId={analysisId} projectId={projectId} view="report" />;
 }
 
 export function AnalysisRunViewPage({
@@ -38,32 +52,40 @@ export function AnalysisRunViewPage({
 }
 
 function AnalysisViewPage({
-  projectId,
   analysisId,
+  projectId,
   view,
-}: Readonly<{ projectId: string; analysisId: string; view: AnalysisView }>) {
+}: Readonly<{ analysisId: string; projectId: string; view: AnalysisView }>) {
   const { apiRequest, status } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [actionError, setActionError] = useState<string | null>(null);
   const analysisQuery = useQuery({
     enabled: status === "authenticated",
     queryFn: () => fetchAnalysis(apiRequest, projectId, analysisId),
     queryKey: ["analysis", projectId, analysisId],
     refetchInterval: (query) => {
-      const data = query.state.data;
-      const run = data?.runs[0];
-      return run?.status === "QUEUED" || run?.status === "RUNNING" ? 2000 : false;
+      const latest = query.state.data?.runs[0];
+      return isActive(latest) ? 2000 : false;
     },
   });
-  const run = analysisQuery.data?.runs[0];
-  const runMutation = useMutation({
+  const analysis = analysisQuery.data;
+  const run = analysis?.runs[0];
+  const startMutation = useMutation({
     mutationFn: () => runAnalysis(apiRequest, projectId, analysisId),
+    onError: () => setActionError("We could not start this analysis. You can safely try again."),
     onSuccess: (createdRun) => {
       queryClient.setQueryData<AnalysisDetail>(["analysis", projectId, analysisId], (current) =>
         current ? { ...current, runs: [createdRun, ...current.runs] } : current,
       );
-      router.push(`/projects/${projectId}/analyses/${analysisId}/progress`);
+      router.replace(`/projects/${projectId}/analyses/${analysisId}/progress`);
     },
+  });
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelAnalysis(apiRequest, projectId, analysisId),
+    onError: () =>
+      setActionError("We could not stop this analysis. It may still complete; refresh to check."),
+    onSuccess: () => void analysisQuery.refetch(),
   });
   const research = useQuery({
     enabled:
@@ -73,759 +95,691 @@ function AnalysisViewPage({
     queryFn: () => fetchAnalysisResearch(apiRequest, projectId, analysisId, run?.id ?? ""),
     queryKey: ["analysis-research", projectId, analysisId, run?.id],
   });
-  const sources = useQuery({
+  const sourceData = useQuery({
     enabled: status === "authenticated" && Boolean(run) && view === "sources",
     queryFn: () => fetchAnalysisResearchSources(apiRequest, projectId, analysisId, run?.id ?? ""),
     queryKey: ["analysis-research-sources", projectId, analysisId, run?.id],
   });
-  const queries = useQuery({
+  const queryData = useQuery({
     enabled: status === "authenticated" && Boolean(run) && view === "research",
     queryFn: () => fetchAnalysisResearchQueries(apiRequest, projectId, analysisId, run?.id ?? ""),
     queryKey: ["analysis-research-queries", projectId, analysisId, run?.id],
   });
-  const conflicts = useQuery({
+  const conflictData = useQuery({
     enabled: status === "authenticated" && Boolean(run) && view === "conflicts",
     queryFn: () => fetchAnalysisResearchConflicts(apiRequest, projectId, analysisId, run?.id ?? ""),
     queryKey: ["analysis-research-conflicts", projectId, analysisId, run?.id],
   });
 
-  if (analysisQuery.isLoading)
+  if (analysisQuery.isLoading) return <LoadingState />;
+  if (analysisQuery.isError || !analysis)
     return (
-      <p className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-600">
-        Loading analysis...
-      </p>
-    );
-  if (analysisQuery.isError || !analysisQuery.data)
-    return (
-      <p className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-700">
-        Analysis not found or inaccessible
-      </p>
+      <ErrorState
+        body="This analysis is unavailable or you no longer have access to it."
+        title="Analysis not found"
+      />
     );
 
-  const analysis = analysisQuery.data;
-  const latestRun = run;
-  const isActive = latestRun?.status === "QUEUED" || latestRun?.status === "RUNNING";
-  const canRetry = Boolean(latestRun?.errorCode);
-  const title =
-    view === "overview"
-      ? "Analysis"
-      : view === "progress"
-        ? "Run progress"
-        : view === "agents"
-          ? "Agents"
-          : view === "research"
-            ? "Research"
-            : view === "sources"
-              ? "Sources"
-              : view === "conflicts"
-                ? "Conflicts"
-                : "Final report";
-
+  const retryable = run?.status === "FAILED" || run?.status === "CANCELLED";
+  const active = isActive(run);
   return (
-    <div className="grid gap-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
+    <div className="mx-auto grid max-w-5xl gap-6">
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 dark:border-slate-800 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 gap-3">
           <Link
-            href={`/projects/${projectId}/analyses`}
             aria-label="Back to analyses"
-            className="mt-1 text-slate-600 hover:text-slate-950"
+            className="mt-1 rounded-lg p-1 text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            href="/home"
           >
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <div>
-            <p className="text-sm font-medium text-teal-700">{title}</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-950">{analysis.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">{analysis.decisionQuestion}</p>
+          <div className="min-w-0">
+            <StatusBadge status={run?.status} />
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+              {analysis.title}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {analysis.decisionQuestion}
+            </p>
           </div>
         </div>
-        {view === "overview" && (!isActive || canRetry) ? (
+        {!run || retryable ? (
           <Button
-            disabled={runMutation.isPending}
-            onClick={() => runMutation.mutate()}
+            disabled={startMutation.isPending}
+            onClick={() => startMutation.mutate()}
             type="button"
           >
             <Play className="h-4 w-4" aria-hidden="true" />
-            {runMutation.isPending ? "Starting..." : canRetry ? "Retry analysis" : "Run analysis"}
+            {startMutation.isPending ? "Starting…" : retryable ? "Try again" : "Analyze"}
           </Button>
         ) : null}
-        {view === "overview" && isActive && !canRetry ? (
-          <Link href={`/projects/${projectId}/analyses/${analysisId}/progress`}>
-            <Button type="button">
-              <Activity className="h-4 w-4" aria-hidden="true" />
-              View progress
-            </Button>
-          </Link>
+        {active ? (
+          <Button
+            onClick={() => router.push(`/projects/${projectId}/analyses/${analysisId}/progress`)}
+            type="button"
+          >
+            <Clock3 className="h-4 w-4" aria-hidden="true" />
+            View progress
+          </Button>
         ) : null}
-      </div>
+      </header>
 
-      <nav
-        aria-label="Analysis sections"
-        className="flex flex-wrap gap-2 border-b border-slate-200 pb-2"
-      >
-        <AnalysisLink
-          active={view === "overview"}
-          href={`/projects/${projectId}/analyses/${analysisId}`}
-          label="Overview"
-        />
-        <AnalysisLink
-          active={view === "progress"}
-          href={`/projects/${projectId}/analyses/${analysisId}/progress`}
-          label="Run progress"
-        />
-        <AnalysisLink
-          active={view === "agents"}
-          href={`/projects/${projectId}/analyses/${analysisId}/agents`}
-          label="Agents"
-        />
-        <AnalysisLink
-          active={view === "research"}
-          href={`/projects/${projectId}/analyses/${analysisId}/research`}
-          label="Research"
-        />
-        <AnalysisLink
-          active={view === "sources"}
-          href={`/projects/${projectId}/analyses/${analysisId}/sources`}
-          label="Sources"
-        />
-        <AnalysisLink
-          active={view === "conflicts"}
-          href={`/projects/${projectId}/analyses/${analysisId}/conflicts`}
-          label="Conflicts"
-        />
-        <AnalysisLink
-          active={view === "report"}
-          href={`/projects/${projectId}/analyses/${analysisId}/report`}
-          label="Final report"
-        />
-      </nav>
-
-      {view === "overview" ? <Overview analysis={analysis} run={latestRun} /> : null}
+      {actionError ? (
+        <p
+          className="rounded-xl bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100"
+          role="alert"
+        >
+          {actionError}
+        </p>
+      ) : null}
       {view === "progress" ? (
-        <Progress run={latestRun} onRefresh={() => void analysisQuery.refetch()} />
+        <ProgressView
+          cancelPending={cancelMutation.isPending}
+          onCancel={() => {
+            if (
+              window.confirm(
+                "Stop this analysis? The completed work will remain available, but no new result will be created.",
+              )
+            )
+              cancelMutation.mutate();
+          }}
+          onRefresh={() => void analysisQuery.refetch()}
+          run={run}
+        />
       ) : null}
-      {view === "agents" ? <Agents run={latestRun} /> : null}
+      {view === "report" ? <ReportView analysis={analysis} run={run} /> : null}
+      {view === "overview" ? <OverviewView analysis={analysis} run={run} /> : null}
+      {view === "agents" ? (
+        <TechnicalRunView
+          body="The existing specialist execution details remain available for power users."
+          run={run}
+          title="Workflow details"
+        />
+      ) : null}
       {view === "research" ? (
-        <Research queries={queries.data} run={latestRun} value={research.data} />
+        <ResearchView queries={queryData.data} research={research.data} />
       ) : null}
-      {view === "sources" ? <Sources value={sources.data} /> : null}
-      {view === "conflicts" ? <Conflicts value={conflicts.data} /> : null}
-      {view === "report" ? <Report analysis={analysis} run={latestRun} /> : null}
+      {view === "sources" ? <SourceView sources={sourceData.data} /> : null}
+      {view === "conflicts" ? <ConflictView conflicts={conflictData.data} /> : null}
+
+      {view !== "progress" ? (
+        <details className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-700 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:text-slate-200">
+            Technical details <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </summary>
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 text-sm dark:border-slate-800">
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/progress`}
+              label="Run progress"
+            />
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/agents`}
+              label="Workflow"
+            />
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/research`}
+              label="Research"
+            />
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/sources`}
+              label="Sources"
+            />
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/conflicts`}
+              label="Conflicts"
+            />
+            <TechnicalLink
+              href={`/projects/${projectId}/analyses/${analysisId}/report`}
+              label="Report"
+            />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
 
-function AnalysisLink({
-  active,
-  href,
-  label,
-}: Readonly<{ active: boolean; href: string; label: string }>) {
+function ReportView({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
+  const [citation, setCitation] = useState<Citation | null>(null);
+  const citationOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const closeCitation = () => {
+    setCitation(null);
+    requestAnimationFrame(() => citationOpenerRef.current?.focus());
+  };
+  const report = asRecord(run?.report?.report);
+  if (!run)
+    return (
+      <EmptyState
+        body="When you are ready, run this analysis to receive a structured recommendation."
+        title="Ready when you are"
+      />
+    );
+  if (!report) return <ProgressView run={run} />;
+  const recommendation =
+    stringValue(report, "recommendation") ??
+    stringValue(report, "recommendedOption") ??
+    "No recommendation was returned.";
+  const summary = stringValue(report, "executiveSummary");
+  const rationale = stringValue(report, "recommendationRationale");
+  const limitations = stringList(report.limitations);
+  const risks = recordList(report.riskRegister);
+  const missing = stringList(report.missingInformation);
+  const nextSteps = stringList(report.implementationRoadmap);
+  const sections = recordList(report.sections).filter((section) =>
+    Boolean(stringValue(section, "content")?.trim()),
+  );
+  const limited =
+    run.status === "COMPLETED_WITH_LIMITATIONS" ||
+    report.insufficientEvidence === true ||
+    report.decisionReady === false ||
+    report.qualityGatePassed === false;
+  const citations = toCitations(run);
+  return (
+    <div className="grid gap-6">
+      {limited ? (
+        <section
+          className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          role="alert"
+        >
+          <div className="flex gap-3">
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <div>
+              <h2 className="font-semibold">Complete with limitations</h2>
+              <p className="mt-1 text-sm leading-6">
+                There isn’t enough reliable information to treat this as a confident decision.
+                Review the missing information before acting.
+              </p>
+              {limitations.length ? <BulletList className="mt-3" items={limitations} /> : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+      {analysis.evidenceMode !== "EXTERNAL_ONLY" && analysis.knowledgeBaseIds.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          No internal knowledge base selected
+        </p>
+      ) : null}
+      <section className="rounded-2xl border border-teal-200 bg-teal-50 p-5 dark:border-teal-900 dark:bg-teal-950/35 sm:p-7">
+        <p className="text-sm font-medium text-teal-800 dark:text-teal-200">Recommendation</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
+          {cleanText(recommendation)}
+        </h2>
+        {summary ? (
+          <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-200">
+            {cleanText(summary)}
+          </p>
+        ) : null}
+        {rationale ? (
+          <p className="mt-4 max-w-3xl whitespace-pre-wrap border-t border-teal-200 pt-4 text-sm leading-7 text-slate-700 dark:border-teal-900 dark:text-slate-200">
+            {cleanText(rationale)}
+          </p>
+        ) : null}
+      </section>
+      <div className="grid gap-6 md:grid-cols-2">
+        {risks.length ? (
+          <InsightCard title="Risks to plan for">
+            <div className="grid gap-3">
+              {risks.map((risk, index) => (
+                <div
+                  className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                  key={`${stringValue(risk, "risk")}-${index}`}
+                >
+                  <p className="font-medium text-slate-950 dark:text-white">
+                    {stringValue(risk, "risk")}
+                  </p>
+                  {stringValue(risk, "mitigation") ? (
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      {stringValue(risk, "mitigation")}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </InsightCard>
+        ) : null}
+        {missing.length ? (
+          <InsightCard title="What is still missing">
+            <BulletList items={missing} />
+          </InsightCard>
+        ) : null}
+        {nextSteps.length ? (
+          <InsightCard title="Suggested next steps">
+            <ol className="grid gap-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
+              {nextSteps.map((step, index) => (
+                <li className="flex gap-3" key={`${step}-${index}`}>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-900 dark:bg-teal-900 dark:text-teal-100">
+                    {index + 1}
+                  </span>
+                  <span>{cleanText(step)}</span>
+                </li>
+              ))}
+            </ol>
+          </InsightCard>
+        ) : null}
+      </div>
+      {sections.map((section, index) => (
+        <InsightCard
+          key={`${stringValue(section, "title")}-${index}`}
+          title={cleanText(stringValue(section, "title") ?? "Details")}
+        >
+          <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-200">
+            {cleanText(stringValue(section, "content") ?? "")}
+          </p>
+        </InsightCard>
+      ))}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Sources used</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          Open a source to see the supporting excerpt without leaving this report.
+        </p>
+        {citations.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {citations.map((item) => (
+              <button
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:border-slate-600 dark:text-teal-200 dark:hover:bg-teal-950"
+                key={`${item.type}-${item.evidenceId}`}
+                onClick={(event) => {
+                  citationOpenerRef.current = event.currentTarget;
+                  setCitation(item);
+                }}
+                type="button"
+              >
+                {item.evidenceId}
+                <span className="ml-1 text-xs text-slate-500 dark:text-slate-400">
+                  {item.type === "external" ? "Web" : "Project"}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            No source excerpts were returned for this report.
+          </p>
+        )}
+      </section>
+      <details className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        <summary className="cursor-pointer text-sm font-medium text-slate-700 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:text-slate-200">
+          Quality and readiness details
+        </summary>
+        <div className="mt-4 grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <p>Report quality: {formatScore(report.reportQualityScore ?? report.qualityScore)}</p>
+          <p>Grounding: {formatScore(report.groundingScore)}</p>
+          <p>Evidence coverage: {formatScore(report.evidenceCoverage)}</p>
+          <p>Decision readiness: {friendlyReadiness(stringValue(report, "decisionReadiness"))}</p>
+        </div>
+      </details>
+      {citation ? <CitationDialog citation={citation} onClose={closeCitation} /> : null}
+    </div>
+  );
+}
+
+function ProgressView({
+  cancelPending,
+  onCancel,
+  onRefresh,
+  run,
+}: Readonly<{
+  cancelPending?: boolean;
+  onCancel?: () => void;
+  onRefresh?: () => void;
+  run?: AnalysisRun;
+}>) {
+  if (!run)
+    return (
+      <EmptyState
+        body="Start the analysis to see its progress here."
+        title="No analysis is running"
+      />
+    );
+  const failed = run.status === "FAILED";
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:p-7">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <StatusBadge status={run.status} />
+          <h2 className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">
+            {friendlyStage(run.currentStage, run.status)}
+          </h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            You can leave this page. The analysis will continue and remain visible from Home.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {onRefresh ? (
+            <button
+              aria-label="Refresh progress"
+              className="rounded-lg border border-slate-300 p-2 text-slate-600 hover:bg-slate-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              onClick={onRefresh}
+              type="button"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
+          {isActive(run) && onCancel ? (
+            <Button
+              className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-300 dark:hover:bg-red-950"
+              disabled={cancelPending}
+              onClick={onCancel}
+              type="button"
+              variant="ghost"
+            >
+              {cancelPending ? "Stopping…" : "Stop analysis"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-7 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <div
+          className="h-full rounded-full bg-teal-700 transition-[width] dark:bg-teal-400"
+          style={{ width: `${run.progress}%` }}
+        />
+      </div>
+      <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{run.progress}% complete</p>
+      {failed || run.errorMessage ? (
+        <p
+          className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200"
+          role="alert"
+        >
+          {run.errorMessage ??
+            "The analysis could not complete. Your original question is still available, and you can try again."}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function OverviewView({
+  analysis,
+  run,
+}: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
+  return (
+    <section className="grid gap-4 md:grid-cols-2">
+      <InsightCard title="What was included">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {analysis.documentIds.length
+            ? `${analysis.documentIds.length} chosen project sources`
+            : "All ready project sources"}
+        </p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {analysis.externalResearchEnabled
+            ? "Web research was included."
+            : "Web research was not included."}
+        </p>
+      </InsightCard>
+      <InsightCard title="Current status">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {run ? friendlyStage(run.currentStage, run.status) : "Not started"}
+        </p>
+      </InsightCard>
+    </section>
+  );
+}
+
+function TechnicalRunView({
+  body,
+  run,
+  title,
+}: Readonly<{ body: string; run?: AnalysisRun; title: string }>) {
+  return (
+    <InsightCard title={title}>
+      <p className="text-sm text-slate-600 dark:text-slate-300">{body}</p>
+      {run?.agentRuns.length ? (
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          {run.agentRuns.length} recorded workflow steps.
+        </p>
+      ) : null}
+    </InsightCard>
+  );
+}
+
+function ResearchView({ queries, research }: Readonly<{ queries: unknown; research: unknown }>) {
+  const details = asRecord(research);
+  return (
+    <InsightCard title="Research details">
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        {details
+          ? "Public-source research was handled within the configured safety limits."
+          : "No web research was used for this analysis."}
+      </p>
+      {Array.isArray(queries) && queries.length ? (
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          {queries.length} research queries were completed.
+        </p>
+      ) : null}
+    </InsightCard>
+  );
+}
+
+function SourceView({ sources }: Readonly<{ sources: unknown }>) {
+  const entries = Array.isArray(sources) ? sources : [];
+  return (
+    <InsightCard title="Source details">
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        {entries.length
+          ? `${entries.length} web sources were reviewed. Rejected sources are not presented as trusted evidence.`
+          : "No external sources were selected."}
+      </p>
+    </InsightCard>
+  );
+}
+
+function ConflictView({ conflicts }: Readonly<{ conflicts: unknown }>) {
+  const entries = Array.isArray(conflicts) ? conflicts : [];
+  return (
+    <InsightCard title="Evidence conflicts">
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        {entries.length
+          ? `${entries.length} evidence conflicts were recorded for review.`
+          : "No evidence conflicts were recorded."}
+      </p>
+    </InsightCard>
+  );
+}
+
+function CitationDialog({
+  citation,
+  onClose,
+}: Readonly<{ citation: Citation; onClose: () => void }>) {
+  return (
+    <div
+      aria-label="Source preview"
+      aria-modal="true"
+      className="fixed inset-0 z-[60] flex items-end bg-slate-950/45 p-0 sm:items-center sm:justify-center sm:p-6"
+      onMouseDown={onClose}
+      role="dialog"
+    >
+      <section
+        className="w-full max-w-xl rounded-t-2xl bg-white p-5 shadow-2xl dark:bg-slate-900 sm:rounded-2xl"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+          if (event.key === "Tab") {
+            event.preventDefault();
+            event.currentTarget.querySelector("button")?.focus();
+          }
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
+              {citation.type === "external" ? "Web source" : "Project source"}
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+              {citation.evidenceId}
+            </h2>
+          </div>
+          <button
+            autoFocus
+            aria-label="Close source preview"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:hover:bg-slate-800"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <blockquote className="mt-5 border-l-2 border-teal-500 pl-4 text-sm leading-7 text-slate-700 dark:text-slate-200">
+          {citation.quote || "No preview excerpt was stored for this source."}
+        </blockquote>
+      </section>
+    </div>
+  );
+}
+
+function TechnicalLink({ href, label }: Readonly<{ href: string; label: string }>) {
   return (
     <Link
-      className={`rounded-md px-3 py-2 text-sm font-medium ${active ? "bg-teal-700 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-teal-700 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
       href={href}
     >
       {label}
     </Link>
   );
 }
-
-function Overview({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
+function InsightCard({ children, title }: Readonly<{ children: ReactNode; title: string }>) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <InfoCard title="Configuration">
-        <InfoRow
-          label="Mode"
-          value={analysis.mode === "MULTI_AGENT" ? "Multi-agent" : "Single-agent"}
-        />
-        <InfoRow label="Time horizon" value={analysis.timeHorizon ?? "Not specified"} />
-        <InfoRow label="Target market" value={analysis.targetMarket ?? "Not specified"} />
-        <InfoRow label="Currency" value={analysis.currency ?? "Not specified"} />
-        <InfoRow label="Knowledge bases" value={`${analysis.knowledgeBaseIds.length} selected`} />
-        <InfoRow
-          label="Documents"
-          value={
-            analysis.documentIds.length
-              ? `${analysis.documentIds.length} selected`
-              : "All documents"
-          }
-        />
-      </InfoCard>
-      <InfoCard title="Latest run">
-        {run ? (
-          <>
-            <InfoRow label="Status" value={run.status} />
-            <InfoRow label="Stage" value={run.currentStage ?? "Queued"} />
-            <InfoRow label="Progress" value={`${run.progress}%`} />
-          </>
-        ) : (
-          <p className="text-sm text-slate-600">This analysis has not been run yet.</p>
-        )}
-      </InfoCard>
-      <InfoCard title="Objectives">
-        <List value={analysis.objectives} empty="No objectives added." />
-      </InfoCard>
-      <InfoCard title="Constraints and assumptions">
-        <List
-          value={[...analysis.constraints, ...analysis.assumptions]}
-          empty="No constraints or assumptions added."
-        />
-      </InfoCard>
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+      <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+function EmptyState({ body, title }: Readonly<{ body: string; title: string }>) {
+  return (
+    <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+      <FileText className="mx-auto h-5 w-5 text-teal-700 dark:text-teal-300" aria-hidden="true" />
+      <h2 className="mt-3 font-semibold text-slate-950 dark:text-white">{title}</h2>
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{body}</p>
+    </section>
+  );
+}
+function LoadingState() {
+  return (
+    <div
+      className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+      role="status"
+    >
+      Loading analysis…
     </div>
   );
 }
-
-function Progress({ onRefresh, run }: Readonly<{ onRefresh: () => void; run?: AnalysisRun }>) {
-  if (!run)
-    return (
-      <EmptyState
-        icon={<Activity className="h-5 w-5" aria-hidden="true" />}
-        title="No run yet"
-        body="Start the analysis from the overview to see live progress."
-      />
-    );
+function ErrorState({ body, title }: Readonly<{ body: string; title: string }>) {
   return (
-    <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-950">Run progress</h3>
-          <p className="text-sm text-slate-600">
-            The page refreshes while the run is queued or running.
-          </p>
-        </div>
-        <button
-          aria-label="Refresh run progress"
-          className="rounded-md p-1 text-teal-700 hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-          onClick={onRefresh}
-          title="Refresh run progress"
-          type="button"
-        >
-          <RefreshCw className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-teal-700 transition-all"
-          style={{ width: `${run.progress}%` }}
-        />
-      </div>
-      <div className="flex flex-wrap justify-between gap-2 text-sm">
-        <span className="font-medium text-slate-950">{run.status}</span>
-        <span className="text-slate-600">
-          {run.currentStage ?? "Waiting to start"} · {run.progress}%
-        </span>
-      </div>
-      {run.errorMessage ? (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{run.errorMessage}</p>
-      ) : null}
+    <section
+      className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"
+      role="alert"
+    >
+      <h2 className="font-semibold">{title}</h2>
+      <p className="mt-1 text-sm">{body}</p>
     </section>
   );
 }
-
-function Agents({ run }: Readonly<{ run?: AnalysisRun }>) {
-  if (!run)
-    return (
-      <EmptyState
-        icon={<Bot className="h-5 w-5" aria-hidden="true" />}
-        title="No agent runs yet"
-        body="Run the analysis to see specialist execution details."
-      />
-    );
+function StatusBadge({ status }: Readonly<{ status?: string }>) {
+  const complete = status === "COMPLETED" || status === "COMPLETED_WITH_LIMITATIONS";
+  const label =
+    status === "RUNNING"
+      ? "In progress"
+      : status === "QUEUED"
+        ? "Getting ready"
+        : status === "COMPLETED_WITH_LIMITATIONS"
+          ? "Complete with limitations"
+          : status === "COMPLETED"
+            ? "Complete"
+            : status === "FAILED"
+              ? "Needs attention"
+              : status === "CANCELLED"
+                ? "Stopped"
+                : "Not started";
   return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-950">Specialist agents</h3>
-      {run.agentRuns.length === 0 ? (
-        <p className="text-sm text-slate-600">Agents will appear here as the run progresses.</p>
-      ) : (
-        run.agentRuns.map((agent, index) => <AgentCard agent={agent} key={index} />)
-      )}
-    </section>
-  );
-}
-
-function Research({
-  queries,
-  run,
-  value,
-}: Readonly<{ queries: unknown; run?: AnalysisRun; value: unknown }>) {
-  const record = asRecord(value);
-  if (!run)
-    return (
-      <EmptyState
-        icon={<Activity className="h-5 w-5" />}
-        title="No research run"
-        body="Start an analysis to see its bounded research plan."
-      />
-    );
-  if (!record)
-    return (
-      <p className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-600">
-        Research is available only for external evidence modes.
-      </p>
-    );
-  const plan = asRecord(record.plan);
-  return (
-    <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap justify-between gap-2">
-        <h3 className="text-lg font-semibold text-slate-950">Controlled research</h3>
-        <span className="text-sm font-medium text-teal-700">
-          {getString(record, "status") ?? "Queued"}
-        </span>
-      </div>
-      <InfoRow label="Search queries" value={formatCount(record.queryCount)} />
-      <InfoRow label="Search results" value={formatCount(record.resultCount)} />
-      <InfoRow label="Selected for fetch" value={formatCount(record.selectedForFetchCount)} />
-      <InfoRow label="Fetched sources" value={formatCount(record.fetchedPageCount)} />
-      <InfoRow label="Extracted sources" value={formatCount(record.extractedCount)} />
-      <InfoRow
-        label="Accepted evidence sources"
-        value={formatCount(record.acceptedEvidenceCount)}
-      />
-      <InfoRow
-        label="Security-rejected sources"
-        value={formatCount(record.securityRejectedCount)}
-      />
-      <InfoRow label="Policy-rejected sources" value={formatCount(record.policyRejectedCount)} />
-      {getString(record, "failureMessage") ? (
-        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
-          {getString(record, "failureMessage")}
-        </p>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+      {complete ? (
+        <CheckCircle2 className="h-3.5 w-3.5 text-teal-700 dark:text-teal-300" aria-hidden="true" />
       ) : null}
-      {plan ? (
-        <div className="grid gap-2 border-t border-slate-100 pt-4">
-          <h4 className="font-medium text-slate-950">Research plan</h4>
-          <p className="text-sm text-slate-700">
-            {getString(plan, "researchObjective") ?? "No research objective available."}
-          </p>
-          <List
-            value={stringArray(plan.searchQueries)}
-            empty="No external queries were executed."
-          />
-        </div>
-      ) : null}
-      <div className="grid gap-2 border-t border-slate-100 pt-4">
-        <h4 className="font-medium text-slate-950">Executed queries</h4>
-        {Array.isArray(queries) && queries.length ? (
-          queries.map((query, index) => {
-            const item = asRecord(query);
-            const results = Array.isArray(item?.results) ? item.results : [];
-            return (
-              <article
-                className="grid gap-1 rounded border border-slate-200 p-3 text-sm"
-                key={getString(item, "id") ?? index}
-              >
-                <div className="flex justify-between gap-3">
-                  <span className="font-medium text-slate-950">
-                    {getString(item, "query") ?? "Query"}
-                  </span>
-                  <span className="text-slate-500">{getString(item, "status") ?? "PENDING"}</span>
-                </div>
-                <p className="text-xs text-slate-600">{results.length} results returned</p>
-                {results.map((result, resultIndex) => {
-                  const candidate = asRecord(result);
-                  return (
-                    <p
-                      className="text-xs text-slate-600"
-                      key={getString(candidate, "id") ?? resultIndex}
-                    >
-                      {getString(candidate, "title") ?? "Untitled source"}:{" "}
-                      {candidate?.selectedForFetch === true
-                        ? "selected"
-                        : (getString(candidate, "rejectionReason") ?? "not selected")}
-                    </p>
-                  );
-                })}
-              </article>
-            );
-          })
-        ) : (
-          <p className="text-sm text-slate-600">No search queries were executed.</p>
-        )}
-      </div>
-    </section>
+      {label}
+    </span>
   );
 }
-
-function Sources({ value }: Readonly<{ value: unknown }>) {
-  const entries = Array.isArray(value) ? value : [];
+function BulletList({ className, items }: Readonly<{ className?: string; items: string[] }>) {
   return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-950">External sources</h3>
-      {entries.length ? (
-        entries.map((entry, index) => {
-          const evidence = asRecord(entry);
-          const snapshot = asRecord(evidence?.researchSnapshot);
-          const source = asRecord(snapshot?.researchSource);
-          const metadata = asRecord(evidence?.metadata);
-          const credibility = asRecord(snapshot?.credibilityAssessment);
-          const warnings = stringArray(snapshot?.warnings);
-          const sourceUrl = getString(metadata, "url");
-          return (
-            <article
-              className="grid gap-2 border-t border-slate-100 pt-4"
-              key={getString(evidence, "id") ?? index}
-            >
-              <div className="flex justify-between gap-3">
-                <h4 className="font-medium text-slate-950">
-                  {getString(evidence, "evidenceId") ?? "W"}
-                  {source ? ` · ${getString(source, "title") ?? "External source"}` : ""}
-                </h4>
-                <span className="text-xs text-slate-500">
-                  {getString(metadata, "sourceType") ?? "Unclassified"}
-                </span>
-              </div>
-              <p className="text-sm text-slate-700">
-                {clip(getString(evidence, "excerpt") ?? "", 600)}
-              </p>
-              <p className="text-xs text-slate-500">
-                {getString(metadata, "publisher") ?? "Publisher unavailable"} ·{" "}
-                {getString(metadata, "freshnessStatus") ?? "Freshness unavailable"}
-              </p>
-              <p className="text-xs text-slate-500">
-                Published: {getString(metadata, "publishedAt") ?? "not confirmed"} · Retrieved:{" "}
-                {getString(metadata, "retrievedAt") ?? "not recorded"} · Credibility:{" "}
-                {formatScore(credibility?.credibilityScore)}
-              </p>
-              {warnings.length ? <List value={warnings} empty="" /> : null}
-              {sourceUrl ? (
-                <a
-                  className="text-sm font-medium text-teal-700 underline"
-                  href={sourceUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open external source
-                </a>
-              ) : null}
-            </article>
-          );
-        })
-      ) : (
-        <p className="text-sm text-slate-600">No external sources were selected.</p>
-      )}
-    </section>
-  );
-}
-
-function Conflicts({ value }: Readonly<{ value: unknown }>) {
-  const entries = Array.isArray(value) ? value : [];
-  return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-950">Evidence conflicts</h3>
-      {entries.length ? (
-        entries.map((entry, index) => {
-          const record = asRecord(entry);
-          return (
-            <article
-              className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-              key={getString(record, "id") ?? index}
-            >
-              <p className="font-semibold">{getString(record, "topic") ?? "Evidence conflict"}</p>
-              <p className="mt-1">
-                {getString(record, "description") ??
-                  "Conflicting evidence must be disclosed in the final report."}
-              </p>
-            </article>
-          );
-        })
-      ) : (
-        <p className="text-sm text-slate-600">No conflicts were detected.</p>
-      )}
-    </section>
-  );
-}
-
-function AgentCard({ agent }: Readonly<{ agent: unknown }>) {
-  const record = asRecord(agent);
-  return (
-    <article className="grid gap-1 rounded-md border border-slate-200 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h4 className="font-medium text-slate-950">
-          {getString(record, "specialist") ?? getString(record, "nodeName") ?? "Specialist"}
-        </h4>
-        <span className="text-xs font-semibold text-slate-600">
-          {getString(record, "status") ?? "PENDING"}
-        </span>
-      </div>
-      {getString(record, "summary") ? (
-        <p className="text-sm text-slate-600">{getString(record, "summary")}</p>
-      ) : null}
-    </article>
-  );
-}
-
-function Report({ analysis, run }: Readonly<{ analysis: AnalysisDetail; run?: AnalysisRun }>) {
-  const report = asRecord(run?.report?.report);
-  if (!run || !report)
-    return (
-      <EmptyState
-        icon={<FileCheck2 className="h-5 w-5" aria-hidden="true" />}
-        title="Final report is not ready"
-        body="Complete a run to generate the grounded final report."
-      />
-    );
-  const sections = Array.isArray(report.sections)
-    ? report.sections.filter((section) => {
-        const item = asRecord(section);
-        return Boolean(getString(item, "content")?.trim());
-      })
-    : [];
-  const limitations = Array.isArray(report.limitations)
-    ? report.limitations.filter((item): item is string => typeof item === "string")
-    : [];
-  const limited =
-    run.status === "COMPLETED_WITH_LIMITATIONS" ||
-    report.insufficientEvidence === true ||
-    report.decisionReady === false ||
-    report.qualityGatePassed === false;
-  const noInternalKnowledgeBase =
-    analysis.evidenceMode !== "EXTERNAL_ONLY" && analysis.knowledgeBaseIds.length === 0;
-  const internalCitations = run.report?.citations ?? [];
-  const externalCitations = run.report?.externalCitations ?? [];
-  const renderedText = [
-    getString(report, "executiveSummary"),
-    getString(report, "recommendation"),
-    ...sections.map((section) => getString(asRecord(section), "content")),
-    ...(Array.isArray(report.riskRegister)
-      ? report.riskRegister.flatMap((risk) => {
-          const item = asRecord(risk);
-          return [getString(item, "risk"), getString(item, "mitigation")];
-        })
-      : []),
-  ]
-    .filter((value): value is string => Boolean(value))
-    .join(" ");
-  const citedInternalEvidence = internalCitations.filter((citation) => {
-    const item = asRecord(citation);
-    const evidenceId = getString(item, "evidenceId");
-    return evidenceId ? renderedText.includes(`[${evidenceId}]`) : false;
-  });
-  return (
-    <section className="grid gap-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      {limited ? (
-        <div
-          className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
-          role="alert"
-        >
-          <p className="font-semibold">Quality gate warning</p>
-          <p className="mt-1">
-            Report quality and decision readiness are evaluated separately. Treat the decision as
-            limited until the failed readiness checks or quality issues are resolved.
-          </p>
-          {limitations.length ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {limitations.map((item) => (
-                <li key={item}>{cleanReportText(item)}</li>
-              ))}
-            </ul>
-          ) : null}
-          {Array.isArray(report.qualityGateChecks) ? (
-            <div className="mt-3">
-              <p className="font-semibold">Quality checks</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5">
-                {report.qualityGateChecks
-                  .filter((item) => asRecord(item)?.passed === false)
-                  .map((item, index) => {
-                    const check = asRecord(item);
-                    return (
-                      <li key={index}>
-                        {getString(check, "check") ?? "Check failed"}:{" "}
-                        {getString(check, "detail") ?? "threshold not met"}
-                      </li>
-                    );
-                  })}
-              </ul>
-            </div>
-          ) : null}
-          {Array.isArray(report.readinessChecks) ? (
-            <div className="mt-3">
-              <p className="font-semibold">Failed readiness checks</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5">
-                {report.readinessChecks
-                  .filter((item) => asRecord(item)?.passed === false)
-                  .map((item, index) => {
-                    const check = asRecord(item);
-                    return (
-                      <li key={index}>
-                        {getString(check, "check") ?? "Readiness check failed"}:{" "}
-                        {getString(check, "detail") ?? "required evidence is missing"}
-                      </li>
-                    );
-                  })}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-      {noInternalKnowledgeBase ? (
-        <div className="rounded-md border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800">
-          No internal knowledge base selected
-        </div>
-      ) : null}
-      <div>
-        <h3 className="text-xl font-semibold text-slate-950">
-          {cleanReportText(getString(report, "recommendation") ?? "Recommendation")}
-        </h3>
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-          {cleanReportText(
-            getString(report, "executiveSummary") ?? "No executive summary was returned.",
-          )}
-        </p>
-      </div>
-      {sections.map((section, index) => {
-        const item = asRecord(section);
-        return (
-          <article className="grid gap-1 border-t border-slate-100 pt-4" key={index}>
-            <h4 className="font-semibold text-slate-950">
-              {cleanReportText(getString(item, "title") ?? "Section")}
-            </h4>
-            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
-              {cleanReportText(getString(item, "content") ?? "")}
-            </p>
-          </article>
-        );
-      })}
-      <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-        <span>Report quality: {formatScore(report.reportQualityScore ?? report.qualityScore)}</span>
-        <span>Grounding: {formatScore(report.groundingScore)}</span>
-        <span>Citation validity: {formatScore(report.citationValidityScore)}</span>
-        <span>Supported claims: {formatScore(report.supportedClaimRatio)}</span>
-        <span>Unsupported claims: {formatCount(report.unsupportedClaimCount)}</span>
-        <span>Evidence coverage: {formatScore(report.evidenceCoverage)}</span>
-        <span>Evidence sufficiency: {formatScore(report.evidenceSufficiencyScore)}</span>
-        <span>
-          Decision readiness: {getString(report, "decisionReadiness") ?? "LOW"} (
-          {formatScore(report.decisionReadinessScore)})
-        </span>
-        <span>Confidence in sourced facts: {getString(report, "factsConfidence") ?? "LOW"}</span>
-        <span>Confidence in decision: {getString(report, "decisionConfidence") ?? "LOW"}</span>
-        {limited ? (
-          <span className="font-semibold text-amber-700">Completed with limitations</span>
-        ) : null}
-      </div>
-      {Array.isArray(report.unsupportedClaimDetails) && report.unsupportedClaimDetails.length ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-          <p className="font-semibold">Unsupported claim details</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            {report.unsupportedClaimDetails.map((detail, index) => (
-              <li key={index}>{String(detail)}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      <div className="grid gap-3 border-t border-slate-100 pt-4 text-sm">
-        <h4 className="font-semibold text-slate-950">Evidence provenance</h4>
-        <p className="text-slate-600">
-          Selected internal evidence: {internalCitations.length}. Cited internal evidence:{" "}
-          {citedInternalEvidence.length}. Unused internal evidence:{" "}
-          {internalCitations.length - citedInternalEvidence.length}. Accepted external evidence:{" "}
-          {externalCitations.length}.
-        </p>
-        {internalCitations.length ? (
-          <ul className="grid gap-2 text-slate-700">
-            {internalCitations.map((citation, index) => {
-              const item = asRecord(citation);
-              return (
-                <li className="rounded border border-slate-200 p-3" key={index}>
-                  <span className="font-medium">
-                    {getString(item, "evidenceId") ?? "Internal evidence"}
-                  </span>
-                  {getString(item, "quote") ? `: ${getString(item, "quote")}` : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-        {externalCitations.length ? (
-          <ul className="grid gap-2 text-slate-700">
-            {externalCitations.map((citation, index) => {
-              const item = asRecord(citation);
-              return (
-                <li
-                  className="rounded border border-slate-200 p-3"
-                  key={getString(item, "id") ?? index}
-                >
-                  <span className="font-medium">
-                    {getString(item, "evidenceId") ?? "W evidence"}
-                  </span>
-                  {getString(item, "quote") ? `: ${getString(item, "quote")}` : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function InfoCard({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
-  return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
-      {children}
-    </section>
-  );
-}
-function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm first:border-t-0 first:pt-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-slate-950">{value}</span>
-    </div>
-  );
-}
-function List({ value, empty }: Readonly<{ value: string[]; empty: string }>) {
-  return value.length ? (
-    <ul className="grid gap-2 text-sm text-slate-700">
-      {value.map((item, index) => (
-        <li className="border-l-2 border-teal-200 pl-3" key={`${item}-${index}`}>
-          {item}
+    <ul className={`grid gap-2 text-sm leading-6 ${className ?? ""}`}>
+      {items.map((item, index) => (
+        <li className="flex gap-2" key={`${item}-${index}`}>
+          <span aria-hidden="true">•</span>
+          <span>{cleanText(item)}</span>
         </li>
       ))}
     </ul>
-  ) : (
-    <p className="text-sm text-slate-600">{empty}</p>
   );
 }
-function EmptyState({
-  icon,
-  title,
-  body,
-}: Readonly<{ icon: React.ReactNode; title: string; body: string }>) {
-  return (
-    <section className="grid gap-2 rounded-md border border-dashed border-slate-300 bg-white p-8 text-center">
-      <div className="mx-auto text-teal-700">{icon}</div>
-      <h3 className="font-semibold text-slate-950">{title}</h3>
-      <p className="text-sm text-slate-600">{body}</p>
-    </section>
-  );
+function isActive(run?: AnalysisRun): boolean {
+  return run?.status === "QUEUED" || run?.status === "RUNNING";
+}
+function friendlyStage(stage: string | null | undefined, status: string): string {
+  if (status === "QUEUED") return "Preparing your analysis";
+  if (status === "COMPLETED") return "Your recommendation is ready";
+  if (status === "COMPLETED_WITH_LIMITATIONS") return "Your result is ready with limitations";
+  if (status === "FAILED") return "This analysis needs another try";
+  if (status === "CANCELLED") return "This analysis was stopped";
+  const stageMap: Record<string, string> = {
+    coordinator: "Bringing the findings together",
+    critic: "Checking the recommendation",
+    evidence_router: "Reviewing available sources",
+    finalize_report: "Preparing your recommendation",
+    initial_retrieval: "Reviewing project sources",
+    planner: "Understanding the decision",
+    specialist_agents_in_parallel: "Looking at the decision from different angles",
+    validate_input: "Preparing your analysis",
+  };
+  return stage ? (stageMap[stage] ?? "Working on your analysis") : "Working on your analysis";
+}
+function friendlyReadiness(value: string | null): string {
+  return value === "HIGH"
+    ? "Ready to act"
+    : value === "MEDIUM"
+      ? "Useful, with checks still needed"
+      : "More information is needed";
+}
+function toCitations(run: AnalysisRun): Citation[] {
+  const internal = arrayOfRecords(run.report?.citations).map((item) => ({
+    evidenceId: stringValue(item, "evidenceId") ?? "Project source",
+    quote: stringValue(item, "quote") ?? "",
+    type: "project" as const,
+  }));
+  const external = arrayOfRecords(run.report?.externalCitations).map((item) => ({
+    evidenceId: stringValue(item, "evidenceId") ?? "Web source",
+    quote: stringValue(item, "quote") ?? "",
+    type: "external" as const,
+  }));
+  return [...internal, ...external];
 }
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
-function getString(record: Record<string, unknown> | null, key: string): string | null {
-  const value = record?.[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+function arrayOfRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.map(asRecord).filter((item): item is Record<string, unknown> => item !== null)
+    : [];
 }
-function cleanReportText(value: string): string {
+function recordList(value: unknown): Record<string, unknown>[] {
+  return arrayOfRecords(value);
+}
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+function stringValue(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+function cleanText(value: string): string {
   return value
     .replace(/\\#{1,6}\s*/g, "")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\\([*_`])/g, "$1");
 }
 function formatScore(value: unknown): string {
-  return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
-}
-function formatCount(value: unknown): string {
-  return typeof value === "number" ? String(value) : "0";
-}
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-function clip(value: string, maximum: number): string {
-  return value.length > maximum ? `${value.slice(0, maximum).trimEnd()}…` : value;
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "Not available";
 }

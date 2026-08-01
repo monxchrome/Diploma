@@ -16,6 +16,8 @@ Phase 5 adds a bounded, asynchronous decision-analysis engine. A decision analys
 
 Phase 6 adds controlled, explicitly enabled external research and a scientific evaluation dashboard. Analyses support `INTERNAL_ONLY`, `EXTERNAL_ONLY`, and `HYBRID` evidence modes. External research is disabled by default, follows a server-owned safety policy, uses bounded provider/search/fetch calls, stores immutable source snapshots, and assigns external evidence identifiers `W1…`; no browser can submit provider credentials or arbitrary tools. Phase 6 also adds project-scoped experiment variants, test cases, queued runs, metric exports, and versioned human evaluation. The initial experiment worker reports deterministic synthetic metrics labelled `SYNTHETIC_EVALUATION`; it is a smoke/integration baseline, not a production benchmark.
 
+Phase 9 adds a conversation-first product surface. After authentication, users land on Home, ask a decision question in one composer, optionally add project sources, and press Analyze. The existing APIs, project authorization, evidence modes, billing and execution engine remain unchanged. See [Phase 9 architecture](docs/architecture/phase-9.md) and the [UX documentation](docs/ux).
+
 ## Architecture
 
 ```text
@@ -144,15 +146,35 @@ Ollama:     http://localhost:11434
 Frontend routes:
 
 ```text
+/home
 /login
 /register
 /dashboard
 /projects
 /projects/new
 /projects/[projectId]
+/experiments
 /settings/profile
 /settings/sessions
 ```
+
+`/dashboard` redirects to `/home`. The legacy `/projects/[projectId]/analyses/new` route redirects to the Home composer with the project context selected.
+
+## Simplified analysis flow
+
+1. Open Home and describe the decision.
+2. The last used project (or the only project) is selected automatically. Create a project inline when none exists.
+3. All ready project sources are included by default; use the source chip to narrow the set or attach a file.
+4. Press **Analyze**. Enter starts the analysis and Shift+Enter adds a line.
+5. Review friendly progress and the recommendation-first result. Open a source or Technical details only when needed.
+
+Drafts are stored locally on the current device and survive reloads, quota errors and transient failures. They never include credentials, tokens, raw file contents, provider keys or system prompts. The composer clears its draft after a successful run start.
+
+Advanced contains the friendly approach selector and an explicit, entitlement-aware web-research option. `AUTO` resolves to the existing `MULTI_AGENT` server mode, Focused resolves to `SINGLE_AGENT`, and Multi-perspective resolves to `MULTI_AGENT`; no new backend mode is created.
+
+The sidebar supports collapse, keyboard navigation and a mobile drawer. Use `Ctrl+K` / `Cmd+K` to open search. New controls expose visible focus styling, system light/dark tokens and reduced-motion behavior. See the [accessibility guide](docs/ux/accessibility.md) and [responsive design guide](docs/ux/responsive-design.md).
+
+Known Phase 9 limitations: it does not change model quality; conversational follow-up remains limited by the existing analysis model; public sharing, comments, mentions, PDF/DOCX export, notification center, mobile apps, offline-first behavior and a user prompt library are not implemented. Technical pages remain available to power users. Phase 10–12 are not part of this repository change.
 
 Auth and project API routes:
 

@@ -7,7 +7,7 @@ import { getWebConfig } from "@/lib/config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  description: "Phase 1 infrastructure status for the Decision Intelligence Platform",
+  description: "A focused workspace for evidence-informed decisions.",
   title: "Decision Intelligence Platform",
 };
 

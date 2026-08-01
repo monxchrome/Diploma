@@ -70,25 +70,36 @@ export function KnowledgeBasesPanel({
 
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-slate-950">Knowledge bases</h3>
+      <div>
+        <h3 className="text-lg font-semibold text-slate-950">Sources</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Add project documents here. Ready sources are used by default when you start an analysis.
+        </p>
+      </div>
       {canEdit ? (
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (name.trim()) create.mutate();
-          }}
-        >
-          <input
-            className="rounded-md border border-slate-300 px-3 text-sm"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Knowledge base name"
-          />
-          <Button disabled={create.isPending} type="submit">
-            Create
-          </Button>
-        </form>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-slate-600 underline underline-offset-4">
+            Manage source collections
+          </summary>
+          <form
+            className="mt-3 flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (name.trim()) create.mutate();
+            }}
+          >
+            <input
+              aria-label="Source collection name"
+              className="rounded-md border border-slate-300 px-3 text-sm"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Source collection name"
+            />
+            <Button disabled={create.isPending} type="submit">
+              Create
+            </Button>
+          </form>
+        </details>
       ) : null}
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {progress !== null ? (
@@ -104,7 +115,9 @@ export function KnowledgeBasesPanel({
         >
           <div>
             <p className="font-medium">{knowledgeBase.name}</p>
-            <p className="text-xs text-slate-600">{knowledgeBase.status}</p>
+            <p className="text-xs text-slate-600">
+              {knowledgeBase.status === "ACTIVE" ? "Available" : "Archived"}
+            </p>
           </div>
           {canEdit ? (
             <label className="cursor-pointer text-sm text-teal-700">
@@ -135,7 +148,7 @@ export function KnowledgeBasesPanel({
               <span className="truncate text-slate-700">{document.originalFilename}</span>
               <div className="ml-3 flex items-center gap-2">
                 <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                  {document.status}
+                  {friendlyDocumentStatus(document.status)}
                 </span>
                 {canEdit && document.status !== "ARCHIVED" ? (
                   <button
@@ -159,6 +172,13 @@ export function KnowledgeBasesPanel({
       ) : null}
     </section>
   );
+}
+
+function friendlyDocumentStatus(status: string): string {
+  if (status === "COMPLETED") return "Ready";
+  if (status === "FAILED") return "Needs attention";
+  if (status === "ARCHIVED") return "Archived";
+  return "Preparing";
 }
 
 function putFile(

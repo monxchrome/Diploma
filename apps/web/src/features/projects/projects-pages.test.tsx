@@ -10,11 +10,17 @@ import { ProjectsListPage } from "./projects-list-page";
 const apiRequestMock = vi.hoisted(() => vi.fn());
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
 }));
 const projectsApiMock = vi.hoisted(() => ({
   archiveProject: vi.fn(),
+  cancelAnalysis: vi.fn(),
   createProject: vi.fn(),
   fetchAnalysis: vi.fn(),
+  fetchAnalysisResearch: vi.fn(),
+  fetchAnalysisResearchConflicts: vi.fn(),
+  fetchAnalysisResearchQueries: vi.fn(),
+  fetchAnalysisResearchSources: vi.fn(),
   fetchProjects: vi.fn(),
   runAnalysis: vi.fn(),
   restoreProject: vi.fn(),
@@ -42,11 +48,17 @@ describe("project pages", () => {
     apiRequestMock.mockReset();
     routerMock.push.mockReset();
     projectsApiMock.archiveProject.mockReset();
+    projectsApiMock.cancelAnalysis.mockReset();
     projectsApiMock.createProject.mockReset();
     projectsApiMock.fetchAnalysis.mockReset();
+    projectsApiMock.fetchAnalysisResearch.mockReset();
+    projectsApiMock.fetchAnalysisResearchConflicts.mockReset();
+    projectsApiMock.fetchAnalysisResearchQueries.mockReset();
+    projectsApiMock.fetchAnalysisResearchSources.mockReset();
     projectsApiMock.fetchProjects.mockReset();
     projectsApiMock.restoreProject.mockReset();
     projectsApiMock.runAnalysis.mockReset();
+    routerMock.replace.mockReset();
   });
 
   afterEach(() => {
@@ -171,8 +183,7 @@ describe("project pages", () => {
       />,
     );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Quality gate warning");
-    expect(screen.getByText("Completed with limitations")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Complete with limitations");
     expect(screen.getByText("Report quality: 25%")).toBeInTheDocument();
     expect(screen.getByText("No internal knowledge base selected")).toBeInTheDocument();
   });

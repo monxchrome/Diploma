@@ -1,5 +1,5 @@
-import { StatusPage } from "@/features/status/status-page";
+import { HomePage } from "@/features/home/home-page";
 
 export default function Page() {
-  return <StatusPage />;
+  return <HomePage />;
 }

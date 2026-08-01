@@ -126,7 +126,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         password,
       });
       applyAuthResult(result);
-      router.push("/dashboard");
+      router.push("/home");
     },
     [applyAuthResult, config.apiBaseUrl, router],
   );
@@ -139,7 +139,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         password,
       });
       applyAuthResult(result);
-      router.push("/dashboard");
+      router.push("/home");
     },
     [applyAuthResult, config.apiBaseUrl, router],
   );
