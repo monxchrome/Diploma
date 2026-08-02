@@ -25,6 +25,7 @@ import { ResearchModule } from "./modules/research/research.module";
 import { ExperimentsModule } from "./modules/experiments/experiments.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { ReportsModule } from "./modules/reports/reports.module";
+import { BenchmarksModule } from "./modules/benchmarks/benchmarks.module";
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { ReportsModule } from "./modules/reports/reports.module";
     AnalysesModule,
     ResearchModule,
     ExperimentsModule,
+    BenchmarksModule,
     BillingModule,
     ReportsModule,
     HealthModule,

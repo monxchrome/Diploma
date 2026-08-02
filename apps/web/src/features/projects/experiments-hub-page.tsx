@@ -34,6 +34,14 @@ export function ExperimentsHubPage() {
           <p className="mt-3 text-slate-600 dark:text-slate-300">
             Experiments stay within a project, so their sources and results remain isolated.
           </p>
+          {usage.data?.limits.benchmarkExecutionAvailable ? (
+            <Link
+              className="mt-4 inline-flex text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
+              href="/experiments/benchmarks"
+            >
+              Open scientific benchmark workspace
+            </Link>
+          ) : null}
         </header>
         {available ? (
           <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">

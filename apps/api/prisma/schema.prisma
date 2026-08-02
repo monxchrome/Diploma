@@ -248,6 +248,108 @@ enum CollaborationNotificationType {
   SHARE_LINK_REVOKED
 }
 
+// Phase 11. `OLLAMA` identifies the configured local runtime, never a model
+// family; local Qwen profiles therefore retain `family = QWEN`.
+enum ModelProviderCode {
+  OPENAI
+  ANTHROPIC
+  OLLAMA
+}
+
+enum ModelRuntime {
+  CLOUD
+  LOCAL_OLLAMA
+}
+
+enum BenchmarkArchitecture {
+  SINGLE_AGENT
+  HOMOGENEOUS_MULTI_AGENT
+  HETEROGENEOUS_MULTI_AGENT
+  ABLATION
+}
+
+enum BenchmarkProtocol {
+  CONTROLLED_EVIDENCE
+  END_TO_END
+}
+
+enum BenchmarkBudgetProtocol {
+  EQUAL_TOTAL_TOKEN_BUDGET
+  PRODUCTION_DEFAULT_BUDGET
+}
+
+enum BenchmarkSuiteStatus {
+  DRAFT
+  READY
+  RUNNING
+  COMPLETED
+  ARCHIVED
+}
+
+enum BenchmarkRunStatus {
+  DRAFT
+  QUEUED
+  RUNNING
+  PAUSED
+  EVALUATING
+  AGGREGATING
+  COMPLETED
+  COMPLETED_WITH_LIMITATIONS
+  FAILED
+  CANCELLED
+}
+
+enum BenchmarkCaseRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_LIMITATIONS
+  FAILED
+  CANCELLED
+  INVALID
+}
+
+enum BenchmarkAgentRole {
+  SINGLE_AGENT
+  PLANNER
+  MARKET_SPECIALIST
+  FINANCE_SPECIALIST
+  LEGAL_SPECIALIST
+  RISK_SPECIALIST
+  STRATEGY_SPECIALIST
+  COORDINATOR
+  CRITIC
+}
+
+enum AutomaticEvaluationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum HumanEvaluationTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  INVALIDATED
+}
+
+enum HumanEvaluationPreference {
+  LEFT
+  RIGHT
+  TIE
+  CANNOT_EVALUATE
+}
+
+enum ReproducibilityArtifactStatus {
+  QUEUED
+  GENERATING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
 model SystemCheck {
   id        String   @id @default(uuid())
   service   String
@@ -505,6 +607,7 @@ model Project {
   shareLinks      ShareLink[]
   commentThreads  CommentThread[]
   brandProfile    ProjectBrandProfile?
+  benchmarkSuites BenchmarkSuite[]
 
   @@index([ownerId])
   @@index([archivedAt])
@@ -1113,6 +1216,533 @@ model HumanEvaluation {
 
   @@unique([experimentRunId, evaluatorUserId])
   @@index([evaluatorUserId, createdAt])
+}
+
+model ModelCostProfile {
+  id                              String            @id @default(uuid()) @db.Uuid
+  provider                        ModelProviderCode
+  exactModelId                    String
+  version                         String
+  currency                        String
+  inputCostPerMillionTokens       Decimal?          @db.Decimal(18, 6)
+  cachedInputCostPerMillionTokens Decimal?          @db.Decimal(18, 6)
+  outputCostPerMillionTokens      Decimal?          @db.Decimal(18, 6)
+  reasoningCostPerMillionTokens   Decimal?          @db.Decimal(18, 6)
+  effectiveFrom                   DateTime
+  sourceNote                      String
+  createdAt                       DateTime          @default(now())
+  modelProfiles                   ModelProfile[]
+
+  @@unique([provider, exactModelId, version])
+  @@index([provider, exactModelId, effectiveFrom])
+}
+
+model LocalHardwareProfile {
+  id                     String         @id @default(uuid()) @db.Uuid
+  code                   String         @unique
+  displayName            String
+  cpu                    String
+  gpu                    String
+  gpuMemoryBytes         BigInt?
+  ramBytes               BigInt?
+  operatingSystem        String
+  runtimeVersion         String
+  driverVersion          String?
+  powerEstimateWatts     Int?
+  energyPriceMinorPerKwh Int?
+  currency               String?
+  notes                  String?
+  active                 Boolean        @default(true)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  modelProfiles          ModelProfile[]
+
+  @@index([active, code])
+}
+
+model ModelProfile {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  code                   String
+  version                String
+  displayName            String
+  provider               ModelProviderCode
+  family                 String
+  exactModelId           String
+  runtime                ModelRuntime
+  active                 Boolean                @default(true)
+  benchmarkEligible      Boolean                @default(false)
+  capabilities           Json                   @default("{}")
+  contextWindowTokens    Int?
+  maximumOutputTokens    Int?
+  defaultParameters      Json                   @default("{}")
+  costProfileId          String?                @db.Uuid
+  localHardwareProfileId String?                @db.Uuid
+  metadata               Json                   @default("{}")
+  usedAt                 DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  costProfile            ModelCostProfile?      @relation(fields: [costProfileId], references: [id], onDelete: Restrict)
+  localHardwareProfile   LocalHardwareProfile?  @relation(fields: [localHardwareProfileId], references: [id], onDelete: Restrict)
+  assignments            AgentModelAssignment[]
+  judgePoliciesPrimary   JudgePolicy[]          @relation("PrimaryJudgeProfile")
+  judgePoliciesSecondary JudgePolicy[]          @relation("SecondaryJudgeProfile")
+  invocations            ModelInvocation[]
+  automaticEvaluations   AutomaticEvaluation[]
+
+  @@unique([code, version])
+  @@index([provider, exactModelId])
+  @@index([active, benchmarkEligible])
+}
+
+model PromptVersion {
+  id            String                 @id @default(uuid()) @db.Uuid
+  role          BenchmarkAgentRole
+  version       String
+  templateHash  String
+  schemaVersion String
+  sourcePath    String
+  changelog     String?
+  active        Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  assignments   AgentModelAssignment[]
+  judgePolicies JudgePolicy[]
+  invocations   ModelInvocation[]
+
+  @@unique([role, version])
+  @@index([templateHash])
+}
+
+model BenchmarkDataset {
+  id          String                    @id @default(uuid()) @db.Uuid
+  code        String                    @unique
+  title       String
+  description String?
+  domain      String
+  createdById String                    @db.Uuid
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  versions    BenchmarkDatasetVersion[]
+}
+
+model BenchmarkDatasetVersion {
+  id                String           @id @default(uuid()) @db.Uuid
+  datasetId         String           @db.Uuid
+  version           String
+  schemaVersion     String
+  contentHash       String
+  caseCount         Int              @default(0)
+  sourcePackageHash String?
+  frozenAt          DateTime?
+  createdById       String           @db.Uuid
+  createdAt         DateTime         @default(now())
+  dataset           BenchmarkDataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  cases             BenchmarkCase[]
+  suites            BenchmarkSuite[] @relation("SuiteDatasetVersion")
+  runs              BenchmarkRun[]
+
+  @@unique([datasetId, version])
+  @@index([contentHash])
+}
+
+model BenchmarkCase {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  datasetVersionId     String                     @db.Uuid
+  code                 String
+  title                String
+  domain               String
+  question             String
+  scenario             String
+  objectives           Json                       @default("[]")
+  constraints          Json                       @default("[]")
+  assumptions          Json                       @default("[]")
+  expectedDecisionType String
+  referenceFacts       Json                       @default("[]")
+  criticalRisks        Json                       @default("[]")
+  expectedAlternatives Json                       @default("[]")
+  knownUnknowns        Json                       @default("[]")
+  goldCitationMappings Json?
+  difficulty           String
+  tags                 Json                       @default("[]")
+  sensitivity          String                     @default("SYNTHETIC")
+  createdAt            DateTime                   @default(now())
+  datasetVersion       BenchmarkDatasetVersion    @relation(fields: [datasetVersionId], references: [id], onDelete: Restrict)
+  evidencePackages     BenchmarkEvidencePackage[]
+  caseRuns             BenchmarkCaseRun[]
+  humanEvaluationTasks HumanEvaluationTask[]
+
+  @@unique([datasetVersionId, code])
+  @@index([datasetVersionId, domain])
+}
+
+model BenchmarkEvidencePackage {
+  id                     String             @id @default(uuid()) @db.Uuid
+  benchmarkCaseId        String             @db.Uuid
+  version                String
+  protocol               BenchmarkProtocol
+  internalEvidence       Json               @default("[]")
+  externalEvidence       Json               @default("[]")
+  citationMappings       Json               @default("{}")
+  sourceMetadata         Json               @default("{}")
+  retrievalConfiguration Json               @default("{}")
+  researchConfiguration  Json               @default("{}")
+  contentHash            String
+  frozenAt               DateTime           @default(now())
+  createdAt              DateTime           @default(now())
+  benchmarkCase          BenchmarkCase      @relation(fields: [benchmarkCaseId], references: [id], onDelete: Restrict)
+  caseRuns               BenchmarkCaseRun[]
+
+  @@unique([benchmarkCaseId, version, protocol])
+  @@index([contentHash])
+}
+
+model BenchmarkSuite {
+  id                        String                   @id @default(uuid()) @db.Uuid
+  projectId                 String                   @db.Uuid
+  datasetVersionId          String?                  @db.Uuid
+  code                      String
+  version                   String
+  title                     String
+  description               String?
+  researchQuestions         Json                     @default("[]")
+  hypotheses                Json                     @default("[]")
+  domain                    String
+  defaultEvaluationRubricId String?                  @db.Uuid
+  status                    BenchmarkSuiteStatus     @default(DRAFT)
+  statisticalPlan           Json                     @default("{}")
+  createdById               String                   @db.Uuid
+  frozenAt                  DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  project                   Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  datasetVersion            BenchmarkDatasetVersion? @relation("SuiteDatasetVersion", fields: [datasetVersionId], references: [id], onDelete: Restrict)
+  defaultEvaluationRubric   EvaluationRubric?        @relation(fields: [defaultEvaluationRubricId], references: [id], onDelete: Restrict)
+  variants                  BenchmarkVariant[]
+  runs                      BenchmarkRun[]
+
+  @@unique([code, version])
+  @@index([projectId, status, createdAt])
+}
+
+model BenchmarkVariant {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  suiteId               String                  @db.Uuid
+  code                  String
+  title                 String
+  description           String?
+  architecture          BenchmarkArchitecture
+  baselineVariantId     String?                 @db.Uuid
+  ablationConfiguration Json?
+  budgetConfiguration   Json                    @default("{}")
+  enabled               Boolean                 @default(true)
+  contentHash           String
+  frozenAt              DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  suite                 BenchmarkSuite          @relation(fields: [suiteId], references: [id], onDelete: Restrict)
+  baselineVariant       BenchmarkVariant?       @relation("BenchmarkVariantBaseline", fields: [baselineVariantId], references: [id], onDelete: Restrict)
+  ablations             BenchmarkVariant[]      @relation("BenchmarkVariantBaseline")
+  assignments           AgentModelAssignment[]
+  caseRuns              BenchmarkCaseRun[]
+  leftComparisons       StatisticalComparison[] @relation("ComparisonLeftVariant")
+  rightComparisons      StatisticalComparison[] @relation("ComparisonRightVariant")
+
+  @@unique([suiteId, code])
+  @@index([suiteId, enabled])
+}
+
+model AgentModelAssignment {
+  id                 String             @id @default(uuid()) @db.Uuid
+  benchmarkVariantId String             @db.Uuid
+  role               BenchmarkAgentRole
+  modelProfileId     String             @db.Uuid
+  promptVersionId    String             @db.Uuid
+  parameters         Json               @default("{}")
+  enabled            Boolean            @default(true)
+  executionOrder     Int                @default(0)
+  createdAt          DateTime           @default(now())
+  benchmarkVariant   BenchmarkVariant   @relation(fields: [benchmarkVariantId], references: [id], onDelete: Restrict)
+  modelProfile       ModelProfile       @relation(fields: [modelProfileId], references: [id], onDelete: Restrict)
+  promptVersion      PromptVersion      @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([benchmarkVariantId, role])
+  @@index([modelProfileId])
+}
+
+model EvaluationRubric {
+  id            String                @id @default(uuid()) @db.Uuid
+  code          String
+  version       String
+  title         String
+  criteria      Json
+  scale         Json
+  weights       Json
+  contentHash   String
+  frozenAt      DateTime?
+  createdAt     DateTime              @default(now())
+  suites        BenchmarkSuite[]
+  judgePolicies JudgePolicy[]
+  humanTasks    HumanEvaluationTask[]
+  evaluations   AutomaticEvaluation[]
+
+  @@unique([code, version])
+  @@index([contentHash])
+}
+
+model JudgePolicy {
+  id                           String           @id @default(uuid()) @db.Uuid
+  code                         String
+  version                      String
+  primaryJudgeModelProfileId   String?          @db.Uuid
+  secondaryJudgeModelProfileId String?          @db.Uuid
+  promptVersionId              String           @db.Uuid
+  rubricId                     String           @db.Uuid
+  configuration                Json             @default("{}")
+  contentHash                  String
+  createdAt                    DateTime         @default(now())
+  primaryJudgeModelProfile     ModelProfile?    @relation("PrimaryJudgeProfile", fields: [primaryJudgeModelProfileId], references: [id], onDelete: Restrict)
+  secondaryJudgeModelProfile   ModelProfile?    @relation("SecondaryJudgeProfile", fields: [secondaryJudgeModelProfileId], references: [id], onDelete: Restrict)
+  promptVersion                PromptVersion    @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+  rubric                       EvaluationRubric @relation(fields: [rubricId], references: [id], onDelete: Restrict)
+  runs                         BenchmarkRun[]
+
+  @@unique([code, version])
+}
+
+model ExperimentEnvironmentSnapshot {
+  id                  String         @id @default(uuid()) @db.Uuid
+  codeRevision        String?
+  workingTreeDirty    Boolean
+  nodeVersion         String
+  pythonVersion       String
+  operatingSystem     String
+  dependencyHashes    Json           @default("{}")
+  schemaHashes        Json           @default("{}")
+  providerSdkVersions Json           @default("{}")
+  serviceVersions     Json           @default("{}")
+  featureFlags        Json           @default("{}")
+  hardwareProfileIds  Json           @default("[]")
+  contentHash         String
+  createdAt           DateTime       @default(now())
+  runs                BenchmarkRun[]
+
+  @@index([contentHash])
+}
+
+model BenchmarkRun {
+  id                       String                         @id @default(uuid()) @db.Uuid
+  suiteId                  String                         @db.Uuid
+  datasetVersionId         String                         @db.Uuid
+  status                   BenchmarkRunStatus             @default(DRAFT)
+  protocol                 BenchmarkProtocol
+  budgetProtocol           BenchmarkBudgetProtocol
+  repetitions              Int
+  randomizationSeed        Int
+  judgePolicyId            String?                        @db.Uuid
+  environmentSnapshotId    String?                        @db.Uuid
+  startedById              String                         @db.Uuid
+  idempotencyKey           String                         @unique
+  executionPlan            Json                           @default("{}")
+  evaluationPolicy         Json                           @default("{}")
+  estimatedCostMinorUnits  BigInt?
+  actualCostMinorUnits     BigInt?
+  currency                 String?
+  workingTreeDirty         Boolean                        @default(false)
+  pauseRequested           Boolean                        @default(false)
+  cancellationRequested    Boolean                        @default(false)
+  startedAt                DateTime?
+  completedAt              DateTime?
+  cancelledAt              DateTime?
+  failureSummary           Json?
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+  suite                    BenchmarkSuite                 @relation(fields: [suiteId], references: [id], onDelete: Restrict)
+  datasetVersion           BenchmarkDatasetVersion        @relation(fields: [datasetVersionId], references: [id], onDelete: Restrict)
+  judgePolicy              JudgePolicy?                   @relation(fields: [judgePolicyId], references: [id], onDelete: Restrict)
+  environmentSnapshot      ExperimentEnvironmentSnapshot? @relation(fields: [environmentSnapshotId], references: [id], onDelete: Restrict)
+  caseRuns                 BenchmarkCaseRun[]
+  humanEvaluationTasks     HumanEvaluationTask[]
+  statisticalComparisons   StatisticalComparison[]
+  reproducibilityArtifacts ReproducibilityArtifact[]
+
+  @@index([suiteId, status, createdAt])
+  @@index([startedById, createdAt])
+}
+
+model BenchmarkCaseRun {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  benchmarkRunId      String                    @db.Uuid
+  benchmarkCaseId     String                    @db.Uuid
+  benchmarkVariantId  String                    @db.Uuid
+  repetitionIndex     Int
+  executionOrder      Int
+  status              BenchmarkCaseRunStatus    @default(QUEUED)
+  attempt             Int                       @default(0)
+  evidencePackageId   String?                   @db.Uuid
+  analysisRunId       String?                   @db.Uuid
+  outputSnapshot      Json?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  latencyMs           Int?
+  totalProviderCalls  Int                       @default(0)
+  totalInputTokens    Int?
+  totalOutputTokens   Int?
+  totalCachedTokens   Int?
+  totalCostMinorUnits BigInt?
+  currency            String?
+  failureCode         String?
+  failureMessage      String?
+  resultHash          String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  benchmarkRun        BenchmarkRun              @relation(fields: [benchmarkRunId], references: [id], onDelete: Restrict)
+  benchmarkCase       BenchmarkCase             @relation(fields: [benchmarkCaseId], references: [id], onDelete: Restrict)
+  benchmarkVariant    BenchmarkVariant          @relation(fields: [benchmarkVariantId], references: [id], onDelete: Restrict)
+  evidencePackage     BenchmarkEvidencePackage? @relation(fields: [evidencePackageId], references: [id], onDelete: Restrict)
+  invocations         ModelInvocation[]
+  evaluations         AutomaticEvaluation[]
+  humanTasksAsLeft    HumanEvaluationTask[]     @relation("LeftCaseRun")
+  humanTasksAsRight   HumanEvaluationTask[]     @relation("RightCaseRun")
+
+  @@unique([benchmarkRunId, benchmarkCaseId, benchmarkVariantId, repetitionIndex])
+  @@index([benchmarkRunId, status, executionOrder])
+}
+
+model ModelInvocation {
+  id                      String             @id @default(uuid()) @db.Uuid
+  benchmarkCaseRunId      String             @db.Uuid
+  agentRole               BenchmarkAgentRole
+  sequenceIndex           Int
+  modelProfileId          String             @db.Uuid
+  promptVersionId         String?            @db.Uuid
+  provider                ModelProviderCode
+  exactModelId            String
+  requestHash             String
+  responseHash            String?
+  parameters              Json               @default("{}")
+  inputTokens             Int?
+  outputTokens            Int?
+  cachedTokens            Int?
+  reasoningTokens         Int?
+  latencyMs               Int
+  timeToFirstTokenMs      Int?
+  estimatedCostMinorUnits BigInt?
+  currency                String?
+  finishReason            String
+  status                  String
+  providerRequestIdHash   String?
+  createdAt               DateTime           @default(now())
+  benchmarkCaseRun        BenchmarkCaseRun   @relation(fields: [benchmarkCaseRunId], references: [id], onDelete: Restrict)
+  modelProfile            ModelProfile       @relation(fields: [modelProfileId], references: [id], onDelete: Restrict)
+  promptVersion           PromptVersion?     @relation(fields: [promptVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([benchmarkCaseRunId, sequenceIndex])
+  @@index([modelProfileId, createdAt])
+}
+
+model AutomaticEvaluation {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  benchmarkCaseRunId  String                    @db.Uuid
+  evaluatorType       String
+  evaluatorVersion    String
+  rubricId            String?                   @db.Uuid
+  judgeModelProfileId String?                   @db.Uuid
+  metrics             Json                      @default("{}")
+  score               Decimal?                  @db.Decimal(12, 6)
+  confidence          Decimal?                  @db.Decimal(12, 6)
+  rawResultHash       String?
+  status              AutomaticEvaluationStatus @default(PENDING)
+  failureCode         String?
+  createdAt           DateTime                  @default(now())
+  benchmarkCaseRun    BenchmarkCaseRun          @relation(fields: [benchmarkCaseRunId], references: [id], onDelete: Restrict)
+  rubric              EvaluationRubric?         @relation(fields: [rubricId], references: [id], onDelete: Restrict)
+  judgeModelProfile   ModelProfile?             @relation(fields: [judgeModelProfileId], references: [id], onDelete: Restrict)
+
+  @@index([benchmarkCaseRunId, evaluatorType])
+}
+
+model HumanEvaluationTask {
+  id                  String                     @id @default(uuid()) @db.Uuid
+  benchmarkRunId      String                     @db.Uuid
+  benchmarkCaseId     String                     @db.Uuid
+  leftCaseRunId       String                     @db.Uuid
+  rightCaseRunId      String                     @db.Uuid
+  leftDisplayPosition Int
+  assignedEvaluatorId String?                    @db.Uuid
+  status              HumanEvaluationTaskStatus  @default(PENDING)
+  rubricId            String                     @db.Uuid
+  deadline            DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  invalidatedAt       DateTime?
+  createdAt           DateTime                   @default(now())
+  benchmarkRun        BenchmarkRun               @relation(fields: [benchmarkRunId], references: [id], onDelete: Restrict)
+  benchmarkCase       BenchmarkCase              @relation(fields: [benchmarkCaseId], references: [id], onDelete: Restrict)
+  leftCaseRun         BenchmarkCaseRun           @relation("LeftCaseRun", fields: [leftCaseRunId], references: [id], onDelete: Restrict)
+  rightCaseRun        BenchmarkCaseRun           @relation("RightCaseRun", fields: [rightCaseRunId], references: [id], onDelete: Restrict)
+  rubric              EvaluationRubric           @relation(fields: [rubricId], references: [id], onDelete: Restrict)
+  evaluations         BenchmarkHumanEvaluation[]
+
+  @@index([benchmarkRunId, status])
+  @@index([assignedEvaluatorId, status])
+}
+
+model BenchmarkHumanEvaluation {
+  id              String                    @id @default(uuid()) @db.Uuid
+  taskId          String                    @db.Uuid
+  evaluatorId     String                    @db.Uuid
+  preferredOutput HumanEvaluationPreference
+  criterionScores Json                      @default("{}")
+  confidence      Int
+  notes           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime                  @default(now())
+  task            HumanEvaluationTask       @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, evaluatorId])
+  @@index([evaluatorId, createdAt])
+}
+
+model StatisticalComparison {
+  id                    String           @id @default(uuid()) @db.Uuid
+  benchmarkRunId        String           @db.Uuid
+  leftVariantId         String           @db.Uuid
+  rightVariantId        String           @db.Uuid
+  metric                String
+  sampleSize            Int
+  testName              String
+  assumptions           Json             @default("{}")
+  descriptiveStatistics Json             @default("{}")
+  effectSize            Decimal?         @db.Decimal(12, 6)
+  confidenceInterval    Json             @default("{}")
+  pValue                Decimal?         @db.Decimal(12, 6)
+  adjustedPValue        Decimal?         @db.Decimal(12, 6)
+  correctionMethod      String?
+  interpretation        String
+  warnings              Json             @default("[]")
+  createdAt             DateTime         @default(now())
+  benchmarkRun          BenchmarkRun     @relation(fields: [benchmarkRunId], references: [id], onDelete: Restrict)
+  leftVariant           BenchmarkVariant @relation("ComparisonLeftVariant", fields: [leftVariantId], references: [id], onDelete: Restrict)
+  rightVariant          BenchmarkVariant @relation("ComparisonRightVariant", fields: [rightVariantId], references: [id], onDelete: Restrict)
+
+  @@index([benchmarkRunId, metric])
+}
+
+model ReproducibilityArtifact {
+  id             String                        @id @default(uuid()) @db.Uuid
+  benchmarkRunId String                        @db.Uuid
+  status         ReproducibilityArtifactStatus @default(QUEUED)
+  objectKey      String?
+  checksum       String?
+  byteSize       Int?
+  manifestHash   String
+  expiresAt      DateTime?
+  failureCode    String?
+  createdAt      DateTime                      @default(now())
+  completedAt    DateTime?
+  benchmarkRun   BenchmarkRun                  @relation(fields: [benchmarkRunId], references: [id], onDelete: Restrict)
+
+  @@index([benchmarkRunId, status])
 }
 
 model ProjectMember {

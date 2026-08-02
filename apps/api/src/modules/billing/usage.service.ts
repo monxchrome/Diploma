@@ -24,6 +24,7 @@ export type UsageMetric =
   | "monthlyExternalBytes"
   | "monthlyExternalResearchQueries"
   | "monthlyExperimentRuns"
+  | "monthlyBenchmarkRuns"
   | "monthlyFetchedExternalPages"
   | "monthlyMultiAgentRuns"
   | "monthlySingleAgentRuns"

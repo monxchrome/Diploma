@@ -924,6 +924,7 @@ export const PlanEntitlementsSchema = z.object({
   monthlyFetchedExternalPages: BillingLimitSchema,
   monthlyExternalBytes: BillingLimitSchema,
   monthlyExperimentRuns: BillingLimitSchema,
+  monthlyBenchmarkRuns: BillingLimitSchema.default(0),
   maximumExperimentVariants: BillingLimitSchema,
   maximumExperimentCases: BillingLimitSchema,
   maximumExperimentRepetitions: BillingLimitSchema,
@@ -952,6 +953,11 @@ export const PlanEntitlementsSchema = z.object({
   shareLinkNoExpiryAvailable: z.boolean().default(false),
   externalCommentingAvailable: z.boolean().default(false),
   versionComparisonAvailable: z.boolean().default(false),
+  benchmarkExecutionAvailable: z.boolean().default(false),
+  externalProviderBenchmarkAvailable: z.boolean().default(false),
+  localModelBenchmarkAvailable: z.boolean().default(false),
+  heterogeneousBenchmarkAvailable: z.boolean().default(false),
+  humanEvaluationAvailable: z.boolean().default(false),
 });
 export type PlanEntitlements = z.infer<typeof PlanEntitlementsSchema>;
 
@@ -1000,3 +1006,178 @@ export const BillingUsageSchema = z.object({
   resetAt: z.string().datetime(),
 });
 export type BillingUsage = z.infer<typeof BillingUsageSchema>;
+
+// Phase 11 — benchmark contracts are deliberately provider-neutral.  Secrets,
+// provider base URLs, hidden prompts, and raw provider payloads never cross this
+// browser/API boundary.
+export const ModelProviderCodeSchema = z.enum(["OPENAI", "ANTHROPIC", "OLLAMA"]);
+export type ModelProviderCode = z.infer<typeof ModelProviderCodeSchema>;
+
+export const ModelRuntimeSchema = z.enum(["CLOUD", "LOCAL_OLLAMA"]);
+export type ModelRuntime = z.infer<typeof ModelRuntimeSchema>;
+
+export const BenchmarkArchitectureSchema = z.enum([
+  "SINGLE_AGENT",
+  "HOMOGENEOUS_MULTI_AGENT",
+  "HETEROGENEOUS_MULTI_AGENT",
+  "ABLATION",
+]);
+export type BenchmarkArchitecture = z.infer<typeof BenchmarkArchitectureSchema>;
+
+export const BenchmarkProtocolSchema = z.enum(["CONTROLLED_EVIDENCE", "END_TO_END"]);
+export type BenchmarkProtocol = z.infer<typeof BenchmarkProtocolSchema>;
+
+export const BenchmarkBudgetProtocolSchema = z.enum([
+  "EQUAL_TOTAL_TOKEN_BUDGET",
+  "PRODUCTION_DEFAULT_BUDGET",
+]);
+export type BenchmarkBudgetProtocol = z.infer<typeof BenchmarkBudgetProtocolSchema>;
+
+export const BenchmarkAgentRoleSchema = z.enum([
+  "SINGLE_AGENT",
+  "PLANNER",
+  "MARKET_SPECIALIST",
+  "FINANCE_SPECIALIST",
+  "LEGAL_SPECIALIST",
+  "RISK_SPECIALIST",
+  "STRATEGY_SPECIALIST",
+  "COORDINATOR",
+  "CRITIC",
+]);
+export type BenchmarkAgentRole = z.infer<typeof BenchmarkAgentRoleSchema>;
+
+export const BenchmarkRunStatusSchema = z.enum([
+  "DRAFT",
+  "QUEUED",
+  "RUNNING",
+  "PAUSED",
+  "EVALUATING",
+  "AGGREGATING",
+  "COMPLETED",
+  "COMPLETED_WITH_LIMITATIONS",
+  "FAILED",
+  "CANCELLED",
+]);
+export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
+
+export const ModelCapabilitySchema = z.object({
+  supportsSeed: z.boolean(),
+  supportsStructuredOutput: z.boolean(),
+  supportsStreaming: z.boolean(),
+  supportsSystemPrompt: z.boolean(),
+  supportsToolCalling: z.boolean(),
+});
+export type ModelCapability = z.infer<typeof ModelCapabilitySchema>;
+
+export const ModelProfileSchema = z.object({
+  active: z.boolean(),
+  benchmarkEligible: z.boolean(),
+  capabilities: ModelCapabilitySchema,
+  code: z.string().min(1).max(100),
+  contextWindowTokens: z.number().int().positive().nullable(),
+  displayName: z.string().min(1).max(200),
+  exactModelId: z.string().min(1).max(300),
+  family: z.string().min(1).max(100),
+  id: z.string().uuid(),
+  localHardwareProfileId: z.string().uuid().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  maximumOutputTokens: z.number().int().positive().nullable(),
+  provider: ModelProviderCodeSchema,
+  runtime: ModelRuntimeSchema,
+  version: z.string().min(1).max(100),
+});
+export type ModelProfileDto = z.infer<typeof ModelProfileSchema>;
+
+export const AgentModelAssignmentSchema = z.object({
+  enabled: z.boolean(),
+  maxOutputTokens: z.number().int().positive(),
+  modelProfileId: z.string().uuid(),
+  order: z.number().int().nonnegative(),
+  promptVersionId: z.string().uuid(),
+  role: BenchmarkAgentRoleSchema,
+  seed: z.number().int().nullable(),
+  temperature: z.number().min(0).max(2),
+  timeoutSeconds: z.number().positive().max(600),
+  topP: z.number().min(0).max(1),
+});
+export type AgentModelAssignmentDto = z.infer<typeof AgentModelAssignmentSchema>;
+
+export const BenchmarkVariantSchema = z.object({
+  architecture: BenchmarkArchitectureSchema,
+  assignments: z.array(AgentModelAssignmentSchema).max(9),
+  code: z.string().min(1).max(40),
+  description: z.string().max(2_000),
+  enabled: z.boolean(),
+  id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+});
+export type BenchmarkVariantDto = z.infer<typeof BenchmarkVariantSchema>;
+
+export const BenchmarkCaseSchema = z.object({
+  assumptions: z.array(z.string().max(2_000)).max(30),
+  code: z.string().min(1).max(80),
+  constraints: z.array(z.string().max(2_000)).max(30),
+  difficulty: z.string().min(1).max(40),
+  domain: z.string().min(1).max(100),
+  expectedAlternatives: z.array(z.string().max(2_000)).max(30),
+  expectedDecisionType: z.string().min(1).max(100),
+  knownUnknowns: z.array(z.string().max(2_000)).max(30),
+  objectives: z.array(z.string().max(2_000)).max(30),
+  question: z.string().min(1).max(8_000),
+  scenario: z.string().min(1).max(12_000),
+  sensitivity: z.enum(["SYNTHETIC", "LOW", "MEDIUM", "HIGH"]),
+  tags: z.array(z.string().max(100)).max(30),
+  title: z.string().min(1).max(200),
+});
+export type BenchmarkCaseDto = z.infer<typeof BenchmarkCaseSchema>;
+
+export const BenchmarkEstimateSchema = z.object({
+  estimatedCalls: z.number().int().nonnegative(),
+  estimatedCostMinorUnitsHigh: z.number().int().nonnegative().nullable(),
+  estimatedCostMinorUnitsLow: z.number().int().nonnegative().nullable(),
+  estimatedDurationSecondsHigh: z.number().int().nonnegative(),
+  estimatedDurationSecondsLow: z.number().int().nonnegative(),
+  estimatedInputTokens: z.number().int().nonnegative(),
+  estimatedOutputTokens: z.number().int().nonnegative(),
+  totalCaseRuns: z.number().int().nonnegative(),
+  warnings: z.array(z.string()),
+});
+export type BenchmarkEstimateDto = z.infer<typeof BenchmarkEstimateSchema>;
+
+export const CreateBenchmarkRunRequestSchema = z.object({
+  budgetProtocol: BenchmarkBudgetProtocolSchema,
+  evaluationPolicy: z.record(z.string(), z.unknown()).default({}),
+  idempotencyKey: z.string().uuid(),
+  protocol: BenchmarkProtocolSchema,
+  randomizationSeed: z.number().int(),
+  repetitions: z.number().int().min(1).max(25),
+  selectedVariantIds: z.array(z.string().uuid()).min(1).max(10),
+  suiteVersionId: z.string().uuid(),
+});
+export type CreateBenchmarkRunRequest = z.infer<typeof CreateBenchmarkRunRequestSchema>;
+
+export const BenchmarkRunSchema = z.object({
+  budgetProtocol: BenchmarkBudgetProtocolSchema,
+  completedAt: z.string().datetime().nullable(),
+  id: z.string().uuid(),
+  protocol: BenchmarkProtocolSchema,
+  randomizationSeed: z.number().int(),
+  repetitions: z.number().int().positive(),
+  status: BenchmarkRunStatusSchema,
+  suiteId: z.string().uuid(),
+});
+export type BenchmarkRunDto = z.infer<typeof BenchmarkRunSchema>;
+
+export const StatisticalComparisonSchema = z.object({
+  adjustedPValue: z.number().nullable(),
+  confidenceInterval: z.record(z.string(), z.number()),
+  effectSize: z.number().nullable(),
+  leftVariantId: z.string().uuid(),
+  metric: z.string(),
+  pValue: z.number().nullable(),
+  rightVariantId: z.string().uuid(),
+  sampleSize: z.number().int().nonnegative(),
+  testName: z.string(),
+  warnings: z.array(z.string()),
+});
+export type StatisticalComparisonDto = z.infer<typeof StatisticalComparisonSchema>;

@@ -123,6 +123,11 @@ export class QuotaService {
       | "customBrandingAvailable"
       | "externalCommentingAvailable"
       | "versionComparisonAvailable"
+      | "benchmarkExecutionAvailable"
+      | "externalProviderBenchmarkAvailable"
+      | "localModelBenchmarkAvailable"
+      | "heterogeneousBenchmarkAvailable"
+      | "humanEvaluationAvailable"
     >;
     projectId?: string;
     userId: string;
@@ -148,6 +153,7 @@ export class QuotaService {
       | "maximumActiveShareLinks"
       | "maximumExportArtifactsPerPeriod"
       | "maximumBrandProfiles"
+      | "monthlyBenchmarkRuns"
     >;
     projectId?: string;
     userId: string;

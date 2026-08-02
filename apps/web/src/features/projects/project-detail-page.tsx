@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, BarChart3, RotateCcw, Save, Users } from "lucide-react";
+import { Archive, BarChart3, FlaskConical, RotateCcw, Save, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -169,6 +169,13 @@ export function ProjectDetailPage({ projectId }: Readonly<{ projectId: string }>
                 href={`/projects/${projectId}/experiments`}
               >
                 Experiments
+              </Link>
+              <Link
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-teal-200 px-4 text-sm font-semibold text-teal-800 hover:bg-teal-50"
+                href="/experiments/benchmarks"
+              >
+                <FlaskConical className="h-4 w-4" aria-hidden="true" />
+                Benchmark runs
               </Link>
             </nav>
 

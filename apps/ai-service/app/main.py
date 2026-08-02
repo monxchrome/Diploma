@@ -3,6 +3,7 @@ from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.analyses import router as analyses_router
+from app.api.routes.benchmarks import router as benchmarks_router
 from app.api.routes.health import router as health_router
 from app.api.routes.ingestions import router as ingestions_router
 from app.api.routes.research import router as research_router
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(analyses_router)
+    app.include_router(benchmarks_router)
     app.include_router(ingestions_router)
     app.include_router(retrieval_router)
     app.include_router(research_router)

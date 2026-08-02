@@ -88,6 +88,62 @@ class Settings(BaseSettings):
     agent_model_timeout_seconds: float = Field(
         default=300.0, gt=0, le=600, validation_alias="AGENT_MODEL_TIMEOUT_SECONDS"
     )
+    benchmark_enabled: bool = Field(default=False, validation_alias="BENCHMARK_ENABLED")
+    benchmark_provider_call_timeout_seconds: float = Field(
+        default=120.0,
+        gt=0,
+        le=600,
+        validation_alias="BENCHMARK_PROVIDER_CALL_TIMEOUT_SECONDS",
+    )
+    benchmark_provider_retry_attempts: int = Field(
+        default=2, ge=0, le=5, validation_alias="BENCHMARK_PROVIDER_RETRY_ATTEMPTS"
+    )
+    benchmark_provider_retry_delay_ms: int = Field(
+        default=500, ge=0, le=10_000, validation_alias="BENCHMARK_PROVIDER_RETRY_DELAY_MS"
+    )
+    benchmark_default_temperature: float = Field(
+        default=0.0, ge=0, le=2, validation_alias="BENCHMARK_DEFAULT_TEMPERATURE"
+    )
+    benchmark_default_top_p: float = Field(
+        default=1.0, ge=0, le=1, validation_alias="BENCHMARK_DEFAULT_TOP_P"
+    )
+    benchmark_default_max_output_tokens: int = Field(
+        default=1_024, ge=64, le=16_000, validation_alias="BENCHMARK_DEFAULT_MAX_OUTPUT_TOKENS"
+    )
+    openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
+    openai_benchmark_model_id: str = Field(default="", validation_alias="OPENAI_BENCHMARK_MODEL_ID")
+    openai_benchmark_judge_model_id: str = Field(
+        default="", validation_alias="OPENAI_BENCHMARK_JUDGE_MODEL_ID"
+    )
+    openai_api_version: str = Field(
+        default="chat-completions", validation_alias="OPENAI_API_VERSION"
+    )
+    anthropic_api_key: SecretStr = Field(
+        default=SecretStr(""), validation_alias="ANTHROPIC_API_KEY"
+    )
+    anthropic_benchmark_model_id: str = Field(
+        default="", validation_alias="ANTHROPIC_BENCHMARK_MODEL_ID"
+    )
+    anthropic_benchmark_judge_model_id: str = Field(
+        default="", validation_alias="ANTHROPIC_BENCHMARK_JUDGE_MODEL_ID"
+    )
+    anthropic_api_version: str = Field(
+        default="2023-06-01", validation_alias="ANTHROPIC_API_VERSION"
+    )
+    ollama_benchmark_model_id: str = Field(default="", validation_alias="OLLAMA_BENCHMARK_MODEL_ID")
+    ollama_model_digest: str = Field(default="", validation_alias="OLLAMA_MODEL_DIGEST")
+    ollama_context_window: int | None = Field(
+        default=None, ge=1_024, le=1_000_000, validation_alias="OLLAMA_CONTEXT_WINDOW"
+    )
+    ollama_request_timeout_seconds: float = Field(
+        default=300.0, gt=0, le=600, validation_alias="OLLAMA_REQUEST_TIMEOUT_SECONDS"
+    )
+    ollama_allow_remote_host: bool = Field(
+        default=False, validation_alias="OLLAMA_ALLOW_REMOTE_HOST"
+    )
+    ollama_hardware_profile_code: str = Field(
+        default="", validation_alias="OLLAMA_HARDWARE_PROFILE_CODE"
+    )
     analysis_min_quality_score: float = Field(
         default=0.7, ge=0, le=1, validation_alias="ANALYSIS_MIN_QUALITY_SCORE"
     )
@@ -188,6 +244,10 @@ class Settings(BaseSettings):
         for name, value in placeholders.items():
             if not value or value.startswith("replace-with-") or value == "dip_minio_password":
                 raise ValueError(f"{name} must be configured in production")
+        ollama_host = urlparse(self.ollama_url).hostname or ""
+        local_ollama_hosts = {"localhost", "127.0.0.1", "::1", "ollama"}
+        if not self.ollama_allow_remote_host and ollama_host.casefold() not in local_ollama_hosts:
+            raise ValueError("OLLAMA_BASE_URL must target an approved local runtime in production")
         return self
 
     @property
@@ -207,6 +267,8 @@ def load_docker_secrets() -> None:
         "MINIO_ACCESS_KEY",
         "MINIO_SECRET_KEY",
         "RESEARCH_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
     ):
         filename = os.environ.get(f"{name}_FILE")
         if name in os.environ or not filename:

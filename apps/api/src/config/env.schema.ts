@@ -113,6 +113,41 @@ export const ApiEnvSchema = z
     EVALUATION_LLM_JUDGE_ENABLED: BooleanStringSchema,
     EVALUATION_LLM_JUDGE_PROVIDER: z.string().min(1).max(100).default("disabled"),
     EVALUATION_LLM_JUDGE_MODEL: z.string().min(1).max(200).default("disabled"),
+    BENCHMARK_ENABLED: BooleanStringSchema,
+    BENCHMARK_ADMIN_ONLY: TrueBooleanStringSchema,
+    BENCHMARK_MAX_CASE_RUNS: z.coerce.number().int().min(1).max(10_000).default(240),
+    BENCHMARK_MAX_VARIANTS: z.coerce.number().int().min(1).max(10).default(8),
+    BENCHMARK_MAX_REPETITIONS: z.coerce.number().int().min(1).max(25).default(5),
+    BENCHMARK_MAX_ESTIMATED_COST_MINOR: z.coerce.number().int().nonnegative().default(50_000),
+    BENCHMARK_DEFAULT_CURRENCY: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .default("USD"),
+    BENCHMARK_DEFAULT_RANDOM_SEED: z.coerce.number().int().default(11_042),
+    BENCHMARK_PROVIDER_CALL_TIMEOUT_SECONDS: z.coerce.number().positive().max(600).default(120),
+    BENCHMARK_CASE_TIMEOUT_SECONDS: z.coerce.number().positive().max(1_800).default(600),
+    BENCHMARK_MAX_CONCURRENCY: z.coerce.number().int().positive().max(20).default(2),
+    BENCHMARK_OPENAI_MAX_CONCURRENCY: z.coerce.number().int().positive().max(20).default(2),
+    BENCHMARK_ANTHROPIC_MAX_CONCURRENCY: z.coerce.number().int().positive().max(20).default(2),
+    BENCHMARK_OLLAMA_MAX_CONCURRENCY: z.coerce.number().int().positive().max(10).default(1),
+    BENCHMARK_REPRODUCIBILITY_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("dip-documents"),
+    BENCHMARK_ARTIFACT_RETENTION_DAYS: z.coerce.number().int().positive().max(3_650).default(30),
+    BENCHMARK_HUMAN_EVALUATION_ENABLED: BooleanStringSchema,
+    BENCHMARK_LLM_JUDGE_ENABLED: BooleanStringSchema,
+    BENCHMARK_EQUAL_TOTAL_TOKEN_BUDGET: z.coerce
+      .number()
+      .int()
+      .min(256)
+      .max(100_000)
+      .default(8_000),
+    BENCHMARK_DEFAULT_TEMPERATURE: z.coerce.number().min(0).max(2).default(0),
+    BENCHMARK_DEFAULT_TOP_P: z.coerce.number().min(0).max(1).default(1),
+    BENCHMARK_DEFAULT_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(64).max(16_000).default(1_024),
+    BENCHMARK_PROVIDER_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
+    BENCHMARK_PROVIDER_RETRY_DELAY_MS: z.coerce.number().int().min(0).max(10_000).default(500),
     AUTH_COOKIE_DOMAIN: z.string().optional(),
     AUTH_COOKIE_NAME: z.string().min(1).default("dip_refresh"),
     AUTH_COOKIE_SAME_SITE: SameSiteSchema.default("lax"),

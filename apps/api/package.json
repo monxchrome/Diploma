@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "prisma:validate": "prisma validate",
     "retrieval:reindex": "tsx src/scripts/retrieval-reindex.ts",
+    "benchmark:seed": "tsx src/scripts/seed-phase-11.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

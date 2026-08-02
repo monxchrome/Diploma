@@ -144,6 +144,50 @@ export class AiServiceClient {
     }
   }
 
+  async executeBenchmarkCase(payload: unknown, requestId: string): Promise<unknown> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<unknown>("/v1/internal/benchmarks/case-runs", payload, {
+          headers: {
+            [REQUEST_ID_HEADER]: requestId,
+            "x-internal-service-secret": this.config.getOrThrow<string>(
+              "aiService.ingestionSecret",
+            ),
+          },
+          timeout: this.config.getOrThrow<number>("benchmark.caseTimeoutMs"),
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
+  async healthCheckBenchmarkModel(payload: unknown, requestId: string): Promise<unknown> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<unknown>("/v1/internal/benchmarks/model-profiles/health", payload, {
+          headers: {
+            [REQUEST_ID_HEADER]: requestId,
+            "x-internal-service-secret": this.config.getOrThrow<string>(
+              "aiService.ingestionSecret",
+            ),
+          },
+          timeout: this.config.getOrThrow<number>("benchmark.caseTimeoutMs"),
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        code: ErrorCodes.ExternalServiceError,
+        message: this.formatError(error),
+      });
+    }
+  }
+
   async executeResearch(payload: unknown, requestId: string): Promise<unknown> {
     try {
       const response = await firstValueFrom(

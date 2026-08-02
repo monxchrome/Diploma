@@ -20,6 +20,8 @@ Phase 9 adds a conversation-first product surface. After authentication, users l
 
 Phase 10 adds immutable report versions created after successful analysis runs. Export, printing and sharing operate only on a server-sanitized `ReportSnapshot`, never the mutable report UI. PDF, DOCX and Markdown exports are queued and stored privately; share links use hash-only CSPRNG tokens, may expire or be revoked, and public payloads omit private source and system metadata. See [Phase 10 architecture](docs/architecture/phase-10.md).
 
+Phase 11 adds an opt-in scientific benchmark workspace. It compares frozen single-agent, homogeneous multi-agent, fixed heterogeneous, and cross-provider critic variants against pinned server-owned OpenAI, Anthropic, and Qwen-family-through-Ollama profiles. It is separate from normal analysis and the Phase 6 synthetic experiment worker. See [Phase 11 architecture](docs/architecture/phase-11.md).
+
 ## Architecture
 
 ```text
@@ -254,6 +256,7 @@ pnpm db:generate
 pnpm db:studio
 pnpm healthcheck
 pnpm retrieval:reindex -- --dry-run --verify
+pnpm --filter @dip/api benchmark:seed
 ```
 
 Auth/project checks are included in:
@@ -379,3 +382,37 @@ Usage uses an immutable, idempotent ledger with account-scoped reservations for 
 Billing limitations: Stripe is the only production adapter; TEAM is not seat-based billing; there are no usage overage charges, coupons, manual discounts, internal invoices, tax engine, PayPal, crypto, App Store, or Google Play billing. Estimated model cost is telemetry, not an invoice source of truth. Downgrades preserve data, and over-limit users can still read and delete existing resources.
 
 Run `scripts/production/backup.sh .env.production` for timestamped PostgreSQL, MinIO, and Qdrant backup artifacts. Restore is deliberately manual and requires `CONFIRM_RESTORE=yes`; see `docs/deployment/backups-and-restore.md`. The reference deployment is single-region, has no Kubernetes or multi-region failover, cannot automatically roll back a database migration, supports Stripe as the only production payment adapter, and treats estimated AI costs as telemetry rather than invoice truth.
+
+## Phase 11 scientific benchmarking
+
+Benchmark management is available at `/experiments/benchmarks` to authorized users. The server exposes suite, run, results, human-evaluation and reproducibility endpoints under `/api/benchmark-*`; model profile and provider-health administration require an administrator. Built-in V1–V10 templates cover OpenAI, Anthropic, Qwen through Ollama, fixed cloud/local heterogeneous assignments, and cross-provider critics. A template is a fixed research configuration, not a promise that a provider is reachable.
+
+Profiles contain provider, model family, exact pinned ID, runtime and safe capability metadata. OpenAI and Anthropic are cloud providers. Qwen is a model family and Ollama is the `LOCAL_OLLAMA` runtime; do not record `OLLAMA` as the model family. Profiles used in a run cannot be changed. The seed script is idempotent and creates inactive placeholders plus the synthetic controlled dataset; configure an exact model ID before making a placeholder eligible.
+
+Set these values only in an ignored server-side environment file. Never put provider keys, arbitrary provider URLs, raw request/response bodies, or hidden reasoning in browser requests or committed files:
+
+```dotenv
+BENCHMARK_ENABLED=true
+BENCHMARK_MAX_CASE_RUNS=240
+BENCHMARK_MAX_VARIANTS=8
+BENCHMARK_MAX_REPETITIONS=5
+BENCHMARK_DEFAULT_RANDOM_SEED=11042
+BENCHMARK_PROVIDER_CALL_TIMEOUT_SECONDS=120
+BENCHMARK_CASE_TIMEOUT_SECONDS=600
+BENCHMARK_EQUAL_TOTAL_TOKEN_BUDGET=8000
+OPENAI_API_KEY=
+OPENAI_BENCHMARK_MODEL_ID=
+ANTHROPIC_API_KEY=
+ANTHROPIC_BENCHMARK_MODEL_ID=
+OLLAMA_BENCHMARK_MODEL_ID=
+OLLAMA_MODEL_DIGEST=
+OLLAMA_HARDWARE_PROFILE=
+```
+
+Create a dataset version, cases and controlled evidence packages; freeze the dataset; create and freeze a suite; estimate a run; then select protocol, variants, repetitions and seed. `CONTROLLED_EVIDENCE` reuses the frozen evidence package and does not execute retrieval or live research. `END_TO_END` stores a separate evidence snapshot and has more pipeline confounders. Both protocols record safe invocation accounting, failure state, random order, budgets, statistics and a reproducibility manifest. Optional human tasks are blinded by seeded left/right order.
+
+Benchmark entitlements are additive to the existing billing design: benchmark execution, external/cloud providers, local models, heterogeneous variants and human evaluation are separately gated. A preflight cost/case guard and usage reservation run before a job is queued.
+
+Troubleshooting: use `GET /api/health/model-providers` (administrator only) and `POST /api/model-profiles/:id/health-check` to verify profile configuration without exposing credentials. If a cloud profile reports unavailable, verify its server-only key and exact pinned model ID. If Ollama reports unavailable, verify the runtime URL, installed exact model ID, digest and local hardware; Ollama is a runtime, not a model family. `uv sync --group dev` is required before Python adapter checks.
+
+Limitations: cloud providers can change backend behaviour and may not honor a seed; token accounting and cost are provider-specific estimates; local results depend on exact Qwen model, digest, quantization and hardware; LLM/human evaluation may be biased; small samples give wide intervals; significance does not imply practical importance. Phase 11 does not fine-tune, automatically route production traffic, generate final thesis text, or implement Phase 12.
