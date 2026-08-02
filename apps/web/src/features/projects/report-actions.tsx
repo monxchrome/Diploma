@@ -1,7 +1,7 @@
 "use client";
 
 import { Copy, FileDown, Printer, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,22 @@ const SnapshotSchema = z.object({
 });
 
 type ApiRequest = ReturnType<typeof useAuth>["apiRequest"];
+const ExportJobSchema = z.object({
+  artifact: z
+    .object({ byteSize: z.number(), contentType: z.string(), fileName: z.string() })
+    .nullable(),
+  completedAt: z.string().nullable(),
+  failureCode: z.string().nullable(),
+  format: z.enum(["PDF", "DOCX", "MARKDOWN", "PRINT_HTML"]),
+  id: z.string().uuid(),
+  progress: z.string(),
+  status: z.enum(["QUEUED", "GENERATING", "UPLOADING", "COMPLETED", "FAILED", "CANCELLED"]),
+});
+const ExportDownloadSchema = z.object({
+  expiresAt: z.string(),
+  fileName: z.string(),
+  url: z.string().url(),
+});
 
 export function ReportActions({
   apiRequest,
@@ -37,14 +53,42 @@ export function ReportActions({
 }>) {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportJob, setExportJob] = useState<z.infer<typeof ExportJobSchema> | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<{ fileName: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!exportJobId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const result = await apiRequest(`/api/exports/${exportJobId}`, ExportJobSchema);
+        if (!active) return;
+        setExportJob(result);
+        if (
+          result.status === "COMPLETED" ||
+          result.status === "FAILED" ||
+          result.status === "CANCELLED"
+        )
+          return;
+        window.setTimeout(() => void poll(), 1200);
+      } catch {
+        if (active) setMessage("Не удалось проверить прогресс экспорта.");
+      }
+    };
+    void poll();
+    return () => {
+      active = false;
+    };
+  }, [apiRequest, exportJobId]);
+
   if (!snapshot) return null;
 
   const createExport = async (format: "PDF" | "DOCX" | "MARKDOWN" | "PRINT_HTML") => {
     setPending(true);
     try {
-      await apiRequest(
+      const job = await apiRequest(
         `/api/report-snapshots/${snapshot.id}/exports`,
-        z.object({ id: z.string().uuid() }),
+        ExportJobSchema,
         {
           body: {
             format,
@@ -54,12 +98,21 @@ export function ReportActions({
           method: "POST",
         },
       );
-      setMessage("Export is being prepared. You can continue working while it completes.");
+      setExportJobId(job.id);
+      setExportJob(job);
+      setDownloadUrl(null);
+      setMessage(null);
     } catch {
       setMessage("We could not start the export. Check your plan and try again.");
     } finally {
       setPending(false);
     }
+  };
+
+  const download = async () => {
+    if (!exportJobId) return;
+    const result = await apiRequest(`/api/exports/${exportJobId}/download`, ExportDownloadSchema);
+    setDownloadUrl({ fileName: result.fileName, url: result.url });
   };
 
   const share = async () => {
@@ -127,6 +180,26 @@ export function ReportActions({
       <Button disabled={pending} onClick={() => void createExport("PDF")}>
         <FileDown className="h-4 w-4" aria-hidden="true" /> Export
       </Button>
+      {exportJob ? (
+        <div className="basis-full text-sm text-slate-600 dark:text-slate-300" role="status">
+          Export: {exportJob.progress}
+          {exportJob.status === "COMPLETED" ? (
+            <Button className="ml-2 h-8" onClick={() => void download()} variant="ghost">
+              Download {exportJob.artifact?.fileName ?? "PDF"}
+            </Button>
+          ) : null}
+          {exportJob.status === "FAILED" ? ` (${exportJob.failureCode ?? "unknown error"})` : null}
+        </div>
+      ) : null}
+      {downloadUrl ? (
+        <a
+          className="basis-full text-sm text-blue-700 underline"
+          href={downloadUrl.url}
+          rel="noreferrer"
+        >
+          Download ready: {downloadUrl.fileName}
+        </a>
+      ) : null}
       <Button disabled={pending} onClick={() => void share()}>
         <Share2 className="h-4 w-4" aria-hidden="true" /> Share
       </Button>

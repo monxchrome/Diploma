@@ -66,7 +66,8 @@ export class RateLimitGuard implements CanActivate {
       return this.perMinute("billing", "rateLimit.apiWritePerMinute");
     if (path.includes("upload-intent") || path.includes("complete-upload"))
       return this.perHour("upload", "rateLimit.uploadPerHour");
-    if (path.includes("/analyses")) return this.perHour("analysis", "rateLimit.analysisPerHour");
+    if (path.includes("/analyses") && request.method !== "GET" && request.method !== "HEAD")
+      return this.perHour("analysis", "rateLimit.analysisPerHour");
     if (path.includes("/experiments")) {
       return path.includes("export.")
         ? this.perHour("export", "rateLimit.exportPerHour")
