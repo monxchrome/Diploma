@@ -22,6 +22,8 @@ Phase 10 adds immutable report versions created after successful analysis runs. 
 
 Phase 11 adds an opt-in scientific benchmark workspace. It compares frozen single-agent, homogeneous multi-agent, fixed heterogeneous, and cross-provider critic variants against pinned server-owned OpenAI, Anthropic, and Qwen-family-through-Ollama profiles. It is separate from normal analysis and the Phase 6 synthetic experiment worker. See [Phase 11 architecture](docs/architecture/phase-11.md).
 
+Phase 12 prepares release controls: centrally checked `1.0.0` metadata, safe version endpoints, reproducibility runtime pins, static release/demo checks, and release/operations/defence documentation. It does not declare the application released: the [release readiness audit](docs/release/release-readiness-audit.md) records open blockers and the final gate status.
+
 ## Architecture
 
 ```text
@@ -30,7 +32,7 @@ apps/api        NestJS API, Prisma, Redis, BullMQ, Swagger, health, auth, users,
 apps/ai-service FastAPI service with Pydantic schemas and a LangGraph echo graph
 packages/*      Shared contracts, config helpers, lint and TypeScript presets, UI utilities
 infrastructure  Reserved directories for Docker, monitoring, and nginx assets
-docs            Phase 1 architecture notes and ADRs
+docs            Architecture, ADRs, operations, release, demo, and defence material
 ```
 
 ## Prerequisites
@@ -178,7 +180,7 @@ Advanced contains the friendly approach selector and an explicit, entitlement-aw
 
 The sidebar supports collapse, keyboard navigation and a mobile drawer. Use `Ctrl+K` / `Cmd+K` to open search. New controls expose visible focus styling, system light/dark tokens and reduced-motion behavior. See the [accessibility guide](docs/ux/accessibility.md) and [responsive design guide](docs/ux/responsive-design.md).
 
-Known Phase 10 limitations: password-protected links, email delivery, realtime collaborative editing, arbitrary report HTML/CSS, custom JavaScript, public report search and external logo processing are intentionally not implemented. Phase 11–12 are not part of this repository change.
+Known Phase 10 limitations: password-protected links, email delivery, realtime collaborative editing, arbitrary report HTML/CSS, custom JavaScript, public report search and external logo processing are intentionally not implemented. Phase 12 release preparation is present, but its final release gate is not yet approved; see [known issues](docs/release/known-issues.md).
 
 Auth and project API routes:
 
@@ -255,6 +257,9 @@ pnpm db:migrate
 pnpm db:generate
 pnpm db:studio
 pnpm healthcheck
+pnpm release:version:check
+pnpm release:preflight
+pnpm demo:verify
 pnpm retrieval:reindex -- --dry-run --verify
 pnpm --filter @dip/api benchmark:seed
 ```

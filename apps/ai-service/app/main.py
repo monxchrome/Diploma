@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Decision Intelligence AI Service",
         description="Phase 1 AI service foundation",
-        version="0.1.0",
+        version=settings.app_version,
         middleware=middleware,
     )
     app.state.logger = logger

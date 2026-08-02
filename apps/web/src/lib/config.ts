@@ -3,13 +3,13 @@ import { z } from "zod";
 export const WebEnvSchema = z.object({
   NEXT_PUBLIC_API_BASE_URL: z.string().url().default("http://localhost:3001"),
   NEXT_PUBLIC_ENVIRONMENT: z
-    .enum(["development", "test", "staging", "production"])
+    .enum(["development", "test", "demo", "staging", "production"])
     .default("development"),
 });
 
 export type WebConfig = {
   apiBaseUrl: string;
-  environment: "development" | "test" | "staging" | "production";
+  environment: "development" | "test" | "demo" | "staging" | "production";
 };
 
 export function getWebConfig(): WebConfig {

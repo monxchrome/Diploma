@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { splitCsv } from "@dip/config";
 import { z } from "zod";
 
-const EnvironmentSchema = z.enum(["development", "test", "staging", "production"]);
+const EnvironmentSchema = z.enum(["development", "test", "demo", "staging", "production"]);
 const SameSiteSchema = z.enum(["lax", "strict", "none"]);
 const HttpUrlSchema = z.string().refine(
   (value) => {
@@ -50,7 +50,8 @@ export const ApiEnvSchema = z
   .object({
     APP_BASE_URL: HttpUrlSchema.default("http://localhost:3000"),
     APP_ENV: EnvironmentSchema.optional(),
-    APP_VERSION: z.string().min(1).max(100).default("dev"),
+    APP_VERSION: z.string().min(1).max(100).default("1.0.0"),
+    API_SCHEMA_VERSION: z.string().min(1).max(100).default("v1"),
     APP_WORKER_ONLY: BooleanStringSchema,
     API_BASE_URL: HttpUrlSchema.default("http://localhost:3001"),
     AI_SERVICE_URL: HttpUrlSchema.default("http://localhost:8000"),
@@ -180,9 +181,13 @@ export const ApiEnvSchema = z
     COOKIE_SAME_SITE: SameSiteSchema.optional(),
     COOKIE_SECURE: BooleanStringSchema.optional(),
     CSRF_ENABLED: BooleanStringSchema,
+    BUILD_TIMESTAMP: z.string().min(1).max(100).default("unknown"),
+    DATABASE_SCHEMA_VERSION: z.string().min(1).max(100).default("0011_phase_11_benchmarking"),
     DEPLOYMENT_COMMIT_SHA: z.string().max(100).default("local"),
+    DEPLOYMENT_DIRTY: BooleanStringSchema,
     DEPLOYMENT_ENVIRONMENT: z.string().min(1).max(100).default("local"),
-    DEPLOYMENT_VERSION: z.string().min(1).max(100).default("dev"),
+    DEPLOYMENT_VERSION: z.string().min(1).max(100).default("1.0.0"),
+    FEATURE_SET_VERSION: z.string().min(1).max(100).default("phase-12"),
     DOCUMENT_ALLOWED_EXTENSIONS: z.string().default("pdf,docx,txt,md,markdown,html,htm"),
     DOCUMENT_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25_000_000),
     INGESTION_INTERNAL_SECRET: z.string().min(32).default(DEFAULT_INTERNAL_SECRET),

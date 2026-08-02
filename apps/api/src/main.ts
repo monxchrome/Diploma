@@ -85,7 +85,7 @@ async function bootstrap(): Promise<void> {
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Decision Intelligence API")
     .setDescription("Decision Intelligence Platform API")
-    .setVersion("0.1.0")
+    .setVersion(configService.getOrThrow<string>("app.version"))
     .build();
   SwaggerModule.setup("docs", app, SwaggerModule.createDocument(app, swaggerConfig));
 

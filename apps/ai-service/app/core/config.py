@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-EnvironmentName = Literal["development", "test", "staging", "production"]
+EnvironmentName = Literal["development", "test", "demo", "staging", "production"]
 LogLevel = Literal["critical", "error", "warning", "info", "debug"]
 
 
@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     body_limit_bytes: int = Field(default=1_048_576, ge=1024, le=10_485_760)
     cors_origins: str = Field(default="http://localhost:3000,http://localhost:3001")
     environment: EnvironmentName = Field(default="development", alias="NODE_ENV")
+    app_version: str = Field(default="1.0.0", validation_alias="APP_VERSION")
+    api_schema_version: str = Field(default="v1", validation_alias="API_SCHEMA_VERSION")
+    build_timestamp: str = Field(default="unknown", validation_alias="BUILD_TIMESTAMP")
+    deployment_commit_sha: str = Field(default="local", validation_alias="DEPLOYMENT_COMMIT_SHA")
+    deployment_dirty: bool = Field(default=False, validation_alias="DEPLOYMENT_DIRTY")
+    database_schema_version: str = Field(
+        default="0011_phase_11_benchmarking", validation_alias="DATABASE_SCHEMA_VERSION"
+    )
+    feature_set_version: str = Field(default="phase-12", validation_alias="FEATURE_SET_VERSION")
     langfuse_enabled: bool = Field(default=False)
     langfuse_host: str = Field(default="http://localhost:3002")
     langfuse_public_key: str = Field(default="replace-with-dev-public-key")

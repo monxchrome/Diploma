@@ -13,6 +13,18 @@ export const HealthResponseSchema = z.object({
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
+export const ReleaseVersionResponseSchema = z.object({
+  apiSchemaVersion: z.string(),
+  buildTimestamp: z.string(),
+  commitSha: z.string(),
+  databaseSchemaVersion: z.string(),
+  dirty: z.boolean(),
+  environment: z.string(),
+  featureSetVersion: z.string(),
+  version: z.string(),
+});
+export type ReleaseVersionResponse = z.infer<typeof ReleaseVersionResponseSchema>;
+
 export const AiEchoRequestSchema = z.object({
   message: z.string().min(1).max(1024),
   requestId: z.string().min(1).max(128),

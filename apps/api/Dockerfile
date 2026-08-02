@@ -1,3 +1,5 @@
+ARG APP_VERSION=1.0.0
+
 FROM node:24-bookworm-slim AS base
 WORKDIR /app
 RUN corepack enable
@@ -24,7 +26,11 @@ FROM dependencies AS production-dependencies
 RUN CI=true pnpm install --frozen-lockfile --prod
 
 FROM base AS production
-ENV NODE_ENV=production
+ARG APP_VERSION
+LABEL org.opencontainers.image.title="decision-intelligence-api" \
+  org.opencontainers.image.version="${APP_VERSION}"
+ENV NODE_ENV=production \
+  APP_VERSION=${APP_VERSION}
 RUN useradd --create-home --uid 10001 appuser
 COPY --from=production-dependencies --chown=appuser:appuser /app/node_modules /app/node_modules
 COPY --from=build --chown=appuser:appuser /app/apps/api /app/apps/api

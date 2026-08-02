@@ -1,6 +1,6 @@
 {
   "name": "decision-intelligence-platform",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.17.0",
   "engines": {
@@ -27,7 +27,10 @@
     "infra:up": "docker compose up -d postgres redis qdrant minio",
     "lint": "corepack pnpm db:generate && turbo lint && cd apps/ai-service && python -m uv run ruff check .",
     "prisma:validate": "corepack pnpm --filter @dip/api prisma:validate",
+    "release:preflight": "node scripts/release/preflight.mjs",
+    "release:version:check": "node scripts/release/check-version.mjs",
     "retrieval:reindex": "corepack pnpm --filter @dip/api retrieval:reindex",
+    "demo:verify": "node scripts/demo/verify.mjs",
     "test": "corepack pnpm db:generate && turbo test && cd apps/ai-service && python -m uv run pytest",
     "typecheck": "corepack pnpm db:generate && turbo typecheck && cd apps/ai-service && python -m uv run pyright"
   },

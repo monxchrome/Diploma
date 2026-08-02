@@ -116,6 +116,14 @@ export default function configuration() {
       version: env.APP_VERSION,
       workerOnly: env.APP_WORKER_ONLY,
     },
+    release: {
+      apiSchemaVersion: env.API_SCHEMA_VERSION,
+      buildTimestamp: env.BUILD_TIMESTAMP,
+      commitSha: env.DEPLOYMENT_COMMIT_SHA,
+      databaseSchemaVersion: env.DATABASE_SCHEMA_VERSION,
+      dirty: env.DEPLOYMENT_DIRTY,
+      featureSetVersion: env.FEATURE_SET_VERSION,
+    },
     auth: {
       accessSecret: env.JWT_ACCESS_SECRET,
       accessTtl: env.JWT_ACCESS_TTL,

@@ -1,3 +1,5 @@
+ARG APP_VERSION=1.0.0
+
 FROM python:3.12-slim AS base
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,6 +18,10 @@ EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 FROM dependencies AS production
+ARG APP_VERSION
+LABEL org.opencontainers.image.title="decision-intelligence-ai-service" \
+  org.opencontainers.image.version="${APP_VERSION}"
+ENV APP_VERSION=${APP_VERSION}
 RUN useradd --create-home --uid 10001 appuser
 COPY --chown=appuser:appuser apps/ai-service /app/apps/ai-service
 USER appuser

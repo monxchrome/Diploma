@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const EnvironmentNameSchema = z.enum(["development", "test", "staging", "production"]);
+export const EnvironmentNameSchema = z.enum([
+  "development",
+  "test",
+  "demo",
+  "staging",
+  "production",
+]);
 export type EnvironmentName = z.infer<typeof EnvironmentNameSchema>;
 
 export const requestIdHeaderName = "x-request-id";

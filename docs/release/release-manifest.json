@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "version": "1.0.0",
+  "releaseStatus": "NOT_READY",
+  "sourceCommit": "3dd947fba709c398cc228f911c2a56dd8ce066a7",
+  "sourceState": "Uncommitted Phase 12 working tree based on the sourceCommit; no release build has been produced.",
+  "buildTimestamp": "UNSET_AT_RELEASE",
+  "apiSchemaVersion": "v1",
+  "databaseSchemaVersion": "0011_phase_11_benchmarking",
+  "featureSetVersion": "phase-12",
+  "artifacts": {
+    "sbom": "NOT_GENERATED",
+    "containerDigests": "NOT_GENERATED",
+    "dependencyAudit": "See docs/release/dependency-audit.md",
+    "testEvidence": "See docs/release/verification.md"
+  }
+}

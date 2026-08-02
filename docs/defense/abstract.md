@@ -1,0 +1,7 @@
+# One-Page Abstract
+
+This work presents a Decision Intelligence Platform for evidence-aware support of project decisions. The system uses a Next.js interface, a NestJS application boundary, and a FastAPI AI service. Project documents are stored privately, processed asynchronously, and queried through bounded dense, sparse, and hybrid retrieval. Grounded answers and analysis reports identify internal and, when explicitly enabled, external evidence. The analysis layer supports a focused baseline and a bounded multi-agent workflow with planning, specialist roles, coordination, criticism, quality gates, and explicit uncertainty.
+
+The platform further provides immutable report snapshots, controlled exports and sharing, collaboration records, plan entitlements, usage controls, audit logging, and an opt-in benchmark lane with versioned datasets, frozen suites, provider profiles, reproducibility manifests, and statistical-analysis structures. Safety controls keep provider credentials server-side, constrain web research, validate production configuration, and avoid exposing raw prompts or hidden reasoning.
+
+The implementation does not claim that generated recommendations are correct, that cloud models are deterministic, or that one agent configuration is superior. At the time of this release-preparation audit, no completed benchmark result artifact is available in the working tree; evaluation conclusions must therefore remain unreported until backed by a frozen, reproducible run. The system is decision support and requires human review for consequential use.

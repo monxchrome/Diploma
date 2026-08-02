@@ -2464,7 +2464,10 @@ function jsonSerializable(value: unknown): unknown {
     const withJson = value as { toJSON?: () => unknown };
     if (typeof withJson.toJSON === "function") return jsonSerializable(withJson.toJSON());
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, jsonSerializable(item)]),
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        jsonSerializable(item),
+      ]),
     );
   }
   return value;

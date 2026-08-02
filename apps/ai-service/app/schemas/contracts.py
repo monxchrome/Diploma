@@ -19,6 +19,19 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class ReleaseVersionResponse(BaseModel):
+    version: str
+    build_timestamp: str = Field(alias="buildTimestamp")
+    commit_sha: str = Field(alias="commitSha")
+    dirty: bool
+    environment: str
+    api_schema_version: str = Field(alias="apiSchemaVersion")
+    database_schema_version: str = Field(alias="databaseSchemaVersion")
+    feature_set_version: str = Field(alias="featureSetVersion")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class AiEchoRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1024)
     request_id: str = Field(alias="requestId", min_length=1, max_length=128)

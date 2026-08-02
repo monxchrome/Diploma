@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
 from app.graphs.analysis_graph import build_analysis_graph
-from app.schemas.contracts import HealthResponse, ServiceStatus
+from app.schemas.contracts import HealthResponse, ReleaseVersionResponse, ServiceStatus
 from app.services.research import DeterministicFakeWebSearchProvider, SafeWebFetcher
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -22,6 +22,20 @@ def _health(settings: Settings, status: ServiceStatus = "ok") -> HealthResponse:
 @router.get("", response_model=HealthResponse)
 async def health(settings: SettingsDependency) -> HealthResponse:
     return _health(settings)
+
+
+@router.get("/version", response_model=ReleaseVersionResponse)
+async def version(settings: SettingsDependency) -> ReleaseVersionResponse:
+    return ReleaseVersionResponse(
+        version=settings.app_version,
+        buildTimestamp=settings.build_timestamp,
+        commitSha=settings.deployment_commit_sha,
+        dirty=settings.deployment_dirty,
+        environment=settings.environment,
+        apiSchemaVersion=settings.api_schema_version,
+        databaseSchemaVersion=settings.database_schema_version,
+        featureSetVersion=settings.feature_set_version,
+    )
 
 
 @router.get("/live", response_model=HealthResponse)
